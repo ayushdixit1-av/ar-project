@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DLD Laboratory</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{overflow:hidden;background:#111}
+canvas{display:block}
+#hud{position:fixed;bottom:12px;left:50%;transform:translateX(-50%);z-index:10;background:rgba(0,0,0,.75);color:#9df;padding:8px 18px;border-radius:10px;font-size:11px;pointer-events:none;border:1px solid rgba(60,60,160,.3);text-align:center;line-height:1.7;backdrop-filter:blur(6px)}
+#hud b{color:#7edf9f}
+</style>
+</head>
+<body>
+<div id="hud"><b>Click</b> enter | <b>WASD</b> move | <b>Mouse</b> look | <b>Space/C</b> up/down | <b>Shift</b> fast | <b>Esc</b> exit</div>
+<script src="lib/three.min.js"></script>
+<script>
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(0x1A1E26);
+
+var R=new THREE.WebGLRenderer({antialias:true});
+R.setSize(innerWidth,innerHeight);
+R.setPixelRatio(Math.min(devicePixelRatio,2));
+document.body.appendChild(R.domElement);
+
+var cam=new THREE.PerspectiveCamera(52,innerWidth/innerHeight,0.1,200);
+cam.position.set(0,1.6,11);
+var yaw=0,pitch=0,locked=false;
+
+var RW=20,RD=16,RH=4.2;
+
+// === MATERIALS ===
+function B(c){return new THREE.MeshBasicMaterial({color:c})}
+function L(c,s){return new THREE.MeshLambertMaterial({color:c,shininess:s||10})}
+
+// Structure
+var fFl=L(0xA07848),fFl2=L(0x886030),fWl=L(0xD8D0C4),fCl=L(0xE8E8E8);
+var fTr=L(0x5C3218),fTr2=L(0x3D2010);
+// Furniture
+var fWd=L(0xB88830),fWd2=L(0x7A4E20),fSt=L(0x333333),fSt2=L(0x888888);
+var fPl=L(0xBBBBBB),fPk=L(0x555555),fBk=L(0x1A1A1A),fRb=L(0x222222);
+// Tech
+var fSc=B(0x0A1628),fScG=B(0x0F2840),fScOn=B(0x1560A0);
+var fPCB=L(0x1A6030),fBrd=L(0xE8E0D0),fIC=L(0x0C0C0C);
+// Wires
+var fR=B(0xFF2222),fBl=B(0x2266FF),fY=B(0xDDCC00),fG=B(0x22BB44),fW=B(0xDDDDDD),fK=B(0x111111);
+// Accents
+var fNav=L(0x1E3050);
+
+// === HELPERS ===
+function bx(x,y,z,sx,sy,sz,m){var o=new THREE.Mesh(new THREE.BoxGeometry(sx,sy,sz),m);o.position.set(x,y,z);scene.add(o);return o}
+function cy(x,y,z,r,h,m,s){var o=new THREE.Mesh(new THREE.CylinderGeometry(r,r,h,s||16),m);o.position.set(x,y,z);scene.add(o);return o}
+function sp(x,y,z,r,m){var o=new THREE.Mesh(new THREE.SphereGeometry(r,8,6),m);o.position.set(x,y,z);scene.add(o);return o}
+
+// ===================== ROOM =====================
+scene.add(new THREE.Mesh(new THREE.PlaneGeometry(RW,RD).rotateX(-Math.PI/2),fFl));
+for(var i=-RW/2+0.5;i<RW/2;i+=1.0)bx(i,0.003,0,0.01,0.005,RD,fFl2);
+for(var i=-RD/2+0.7;i<RD/2;i+=1.4)bx(0,0.003,i,RW,0.005,0.01,fFl2);
+
+scene.add(new THREE.Mesh(new THREE.PlaneGeometry(RW,RD).rotateX(Math.PI/2),fCl).translateY(RH));
+
+// Walls
+bx(0,RH/2,-RD/2,RW,RH,0.12,fWl);
+bx(0,RH/2,RD/2,RW,RH,0.12,fWl);
+bx(-RW/2,RH/2,0,0.12,RH,RD,fWl);
+bx(RW/2,RH/2,0,0.12,RH,RD,fWl);
+
+// Baseboard + cornice
+bx(0,0.05,-RD/2+0.07,RW,0.1,0.08,fTr);bx(0,0.05,RD/2-0.07,RW,0.1,0.08,fTr);
+bx(-RW/2+0.07,0.05,0,0.08,0.1,RD,fTr);bx(RW/2-0.07,0.05,0,0.08,0.1,RD,fTr);
+bx(0,RH-0.06,-RD/2+0.06,RW,0.12,0.12,fTr);bx(0,RH-0.06,RD/2-0.06,RW,0.12,0.12,fTr);
+bx(-RW/2+0.06,RH-0.06,0,0.12,0.12,RD,fTr);bx(RW/2-0.06,RH-0.06,0,0.12,0.12,RD,fTr);
+
+// False ceiling grid
+for(var x=-RW/2+2;x<RW/2;x+=4)bx(x,RH-0.015,0,0.05,0.03,RD,fPl);
+for(var z=-RD/2+2;z<RD/2;z+=4)bx(0,RH-0.015,z,RW,0.03,0.05,fPl);
+
+// ===================== WINDOWS =====================
+for(var i=0;i<3;i++){
+  var wz=-5+i*5;
+  bx(RW/2-0.05,2.1,wz,0.05,2.6,2.8,fTr);
+  bx(RW/2-0.01,2.1,wz,0.01,2.3,2.5,B(0x5AA8C8));
+  bx(RW/2+0.06,0.7,wz,0.18,0.04,2.9,fTr2);
+}
+
+// ===================== DOOR =====================
+bx(0,1.35,RD/2-0.05,1.2,2.5,0.1,fNav);
+cy(0.42,1.1,RD/2-0.01,0.013,0.2,fSt2,8);
+
+// ===================== CEILING LED PANELS =====================
+var lps=[];
+for(var x=-6;x<=6;x+=6)for(var z=-6;z<=6;z+=6)lps.push([x,z]);
+lps.forEach(function(p){
+  bx(p[0],RH-0.008,p[1],1.3,0.02,0.65,fPl);
+  bx(p[0],RH-0.025,p[1],1.1,0.008,0.5,B(0xFFF4D0));
+});
+
+// ===================== AC UNITS =====================
+bx(-RW/2+0.15,3.1,4,0.25,0.3,1.0,fPl);
+bx(-RW/2+0.06,3.0,4,0.06,0.06,0.8,fPk);
+bx(-RW/2+0.15,3.1,12,0.25,0.3,1.0,fPl);
+bx(-RW/2+0.06,3.0,12,0.06,0.06,0.8,fPk);
+
+// ===================== CEILING FANS =====================
+for(var i=0;i<4;i++){
+  var fx2=-5+(i%2)*10,fz2=-4+(i>>1)*8;
+  cy(fx2,RH-0.1,fz2,0.18,0.2,fSt2,12);
+  cy(fx2,RH-0.01,fz2,0.015,0.08,fSt2,6);
+  for(var b=0;b<4;b++){
+    var a=b*Math.PI/2;
+    var bl=bx(fx2+Math.cos(a)*0.55,RH-0.22,fz2+Math.sin(a)*0.55,0.14,0.75,0.012,fWd);
+    bl.rotation.y=a;
+  }
+}
+
+// ===================== FIRE EXTINGUISHER =====================
+cy(-RW/2+0.4,0.45,3,0.06,0.8,B(0xDD1111));
+bx(-RW/2+0.4,0.88,3,0.08,0.04,0.04,fSt2);
+
+// ===================== EXIT SIGN =====================
+bx(-1,RH-0.35,RD/2-0.08,0.45,0.18,0.04,B(0x00BB33));
+
+// ===================== CLOCK =====================
+cy(RW/2-0.12,2.8,-5,0.18,0.03,B(0xE0E0E0));
+
+// ===================== CCTV =====================
+[[-RW/2+0.4,-RD/2+0.4],[RW/2-0.4,-RD/2+0.4],[-RW/2+0.4,RD/2-0.4],[RW/2-0.4,RD/2-0.4]].forEach(function(c){
+  bx(c[0],RH-0.08,c[1],0.05,0.1,0.05,fPl);
+  cy(c[0],RH-0.18,c[1],0.025,0.08,fBk,6);
+});
+
+// ===================== CABLE TRAYS =====================
+bx(0,RH-0.1,-6,RW-2,0.04,0.04,fSt);
+bx(0,RH-0.1,6,RW-2,0.04,0.04,fSt);
+bx(-RW/2+0.12,RH/2,-6,0.05,0.7,0.05,fSt);
+bx(-RW/2+0.12,RH/2,6,0.05,0.7,0.05,fSt);
+
+// ===================== SWITCHBOARDS =====================
+for(var i=0;i<3;i++){
+  var sz2=-4+i*4;
+  bx(-RW/2+0.06,1.2,sz2,0.03,0.22,0.18,L(0xD8CDB8));
+  bx(-RW/2+0.04,1.2,sz2,0.02,0.04,0.06,L(0xEDE4D4));
+  bx(-RW/2+0.04,1.12,sz2,0.02,0.04,0.06,L(0xEDE4D4));
+}
+
+// ===================== STORAGE CABINETS =====================
+for(var ci=0;ci<3;ci++){
+  var cx2=-7+ci*2.5;
+  bx(cx2,1,-RD/2+0.25,1.9,1.9,0.45,fWd2);
+  bx(cx2,1,-RD/2+0.03,1.7,1.7,0.02,B(0x99AABB));
+  bx(cx2,1.92,-RD/2+0.03,1.95,0.03,0.03,fSt2);
+  bx(cx2,0.08,-RD/2+0.03,1.95,0.03,0.03,fSt2);
+  bx(cx2-0.97,1,-RD/2+0.03,0.03,1.8,0.03,fSt2);
+  bx(cx2+0.97,1,-RD/2+0.03,0.03,1.8,0.03,fSt2);
+  cy(cx2+0.85,1,-RD/2+0.02,0.007,0.1,fSt2,6);
+  for(var sh=0;sh<3;sh++)bx(cx2,0.4+sh*0.6,-RD/2+0.25,1.7,0.02,0.4,fWd2);
+  for(var bi=0;bi<3;bi++)bx(cx2-0.5+bi*0.45,0.43,-RD/2+0.25,0.3,0.008,0.15,fBrd);
+  for(var bi=0;bi<3;bi++)bx(cx2-0.4+bi*0.4,1.0,-RD/2+0.25,0.1,0.015,0.06,B(0xBB7722));
+  for(var bi=0;bi<3;bi++){cy(cx2-0.4+bi*0.3,1.6,-RD/2+0.25,0.008,0.07,[fR,fBl,fY][bi],5);}
+}
+
+// ===================== WHITEBOARD =====================
+bx(RW/4,1.9,RD/2-0.08,3.4,1.4,0.04,B(0xF0F0E8));
+bx(RW/4,1.9,RD/2-0.08,3.5,1.5,0.02,fSt2);
+bx(RW/4,1.15,RD/2-0.06,0.04,0.03,0.9,fSt2);
+
+// ===================== POSTERS — educational =====================
+var pTitles=[
+  B(0xCC3333),B(0x2277CC),B(0x22AA55),B(0xDD8800),
+  B(0x8844CC),B(0xCC4488),B(0x22AACC),B(0xCC6622),
+  B(0x5544CC),B(0xAA44CC)
+];
+for(var i=0;i<10;i++){
+  var pz2=-7+i*1.35;
+  if(pz2>RD/2-1)break;
+  bx(-RW/2+0.06,2.2,pz2,0.04,0.65,0.85,fWl);
+  bx(-RW/2+0.08,2.2,pz2,0.02,0.55,0.7,pTitles[i]);
+  bx(-RW/2+0.095,2.45,pz2,0.01,0.12,0.5,B(0xF0F0E0));
+  bx(-RW/2+0.095,2.1,pz2,0.01,0.08,0.4,B(0xE0E0D0));
+}
+
+// ===================== 8 WORKSTATIONS =====================
+var wsP=[];
+for(var r=0;r<2;r++)for(var c=0;c<4;c++)wsP.push([-6+c*4,-3+r*6]);
+
+wsP.forEach(function(wp,idx){
+  var tx=wp[0],tz=wp[1];
+
+  // TABLE
+  var tW2=3.2,tD2=1.3,tH2=0.76;
+  bx(tx,tH2,tz,tW2,0.04,tD2,fWd);
+  var hw=tW2/2-0.15,hd=tD2/2-0.12;
+  [tx-hw,tx+hw].forEach(function(lx){[tz-hd,tz+hd].forEach(function(lz){
+    cy(lx,tH2/2,lz,0.022,tH2,fSt);
+  })});
+  bx(tx,0.18,tz-hd,tW2-0.3,0.025,0.025,fSt);
+  bx(tx,0.18,tz+hd,tW2-0.3,0.025,0.025,fSt);
+  bx(tx-hw,0.18,tz,0.025,0.025,tD2-0.24,fSt);
+  bx(tx+hw,0.18,tz,0.025,0.025,tD2-0.24,fSt);
+  bx(tx,0.1,tz,tW2-0.5,0.015,tD2-0.3,fSt);
+  bx(tx-0.85,0.55,tz,0.3,0.18,0.35,fPk);
+  bx(tx-0.85,0.55,tz+0.18,0.03,0.02,0.02,fSt2);
+
+  // CHAIR
+  var cz2=tz+1.9;
+  bx(tx,0.42,cz2,0.44,0.04,0.44,fBk);
+  bx(tx,0.68,cz2+0.2,0.42,0.5,0.035,fBk);
+  cy(tx,0.22,cz2,0.028,0.24,fSt);
+  cy(tx,0.035,cz2,0.24,0.035,fSt);
+  for(var w=0;w<5;w++){var a2=w*Math.PI*2/5;sp(tx+Math.cos(a2)*0.22,0.035,cz2+Math.sin(a2)*0.22,0.022,fRb);}
+
+  // ---- TRAINER KIT (left-back) ----
+  var kx=tx-0.9,kz=tz-0.35;
+  bx(kx,0.79,kz,0.5,0.035,0.32,fPk);
+  bx(kx,0.81,kz,0.48,0.008,0.3,fBk);
+  for(var s=0;s<8;s++){
+    bx(kx-0.18+s*0.048,0.83,kz-0.1,0.018,0.018,0.025,fPl);
+    bx(kx-0.18+s*0.048,0.845,kz-0.1,0.012,0.008,0.012,[fR,fG,fR,fG,fBl,fY,fBl,fY][s]);
+  }
+  bx(kx+0.1,0.83,kz-0.1,0.1,0.018,0.035,fBk);
+  for(var ix3=0;ix3<3;ix3++)for(var iz3=0;iz3<2;iz3++)
+    bx(kx-0.12+ix3*0.07,0.825,kz+0.03+iz3*0.05,0.045,0.006,0.035,fBk);
+  sp(kx+0.18,0.845,kz-0.04,0.012,fR);
+  sp(kx+0.22,0.845,kz-0.04,0.012,fBl);
+  sp(kx+0.26,0.845,kz-0.04,0.012,fY);
+
+  // ---- BREADBOARD (center) ----
+  var brx2=tx+0.1,brz2=tz-0.12;
+  bx(brx2,0.78,brz2,0.34,0.012,0.16,fBrd);
+  for(var w=0;w<8;w++)
+    bx(brx2-0.12+w*0.03,0.787,brz2+(w%3)*0.035-0.035,0.004,0.004,0.06,[fR,fBl,fG,fY,fR,fBl,fG,fY][w]);
+  bx(brx2+0.02,0.79,brz2,0.045,0.008,0.018,fIC);
+  for(var cw=0;cw<5;cw++)
+    bx(brx2-0.08+cw*0.035,0.787,brz2+0.04,0.003,0.003,0.06,[fR,fBl,fG,fY,fW][cw]);
+
+  // ---- DC POWER SUPPLY (right-back) ----
+  var psx2=tx+0.75,psz2=tz-0.1;
+  bx(psx2,0.81,psz2,0.16,0.08,0.22,fPl);
+  bx(psx2-0.03,0.86,psz2,0.04,0.015,0.05,fSc);
+  bx(psx2+0.03,0.86,psz2,0.04,0.015,0.05,fSc);
+  cy(psx2-0.04,0.85,psz2-0.09,0.01,0.012,fSt2,6);
+  cy(psx2+0.04,0.85,psz2-0.09,0.01,0.012,fSt2,6);
+  cy(psx2-0.05,0.84,psz2+0.09,0.006,0.015,fR,5);
+  cy(psx2+0.05,0.84,psz2+0.09,0.006,0.015,fBl,5);
+
+  // ---- MULTIMETER (right-front) ----
+  var mmx2=tx+0.75,mmz2=tz+0.15;
+  bx(mmx2,0.78,mmz2,0.09,0.02,0.16,B(0xCC8800));
+  bx(mmx2,0.795,mmz2+0.03,0.05,0.004,0.04,fSc);
+  cy(mmx2+0.04,0.78,mmz2-0.06,0.003,0.14,fR,4);
+  cy(mmx2-0.04,0.78,mmz2-0.06,0.003,0.14,fBl,4);
+
+  // ---- OSCILLOSCOPE (center-back) ----
+  var osx2=tx+0.25,osz2=tz+0.35;
+  bx(osx2,0.88,osz2,0.26,0.15,0.2,fPl);
+  bx(osx2,0.95,osz2+0.05,0.18,0.11,0.01,fSc);
+  for(var wv=0;wv<10;wv++)
+    bx(osx2-0.07+wv*0.014,0.93+Math.sin(wv*0.65)*0.025,osz2+0.055,0.01,0.004,0.004,B(0x22DD44));
+  for(var bt=0;bt<7;bt++)bx(osx2-0.08+bt*0.024,0.95,osz2-0.08,0.018,0.01,0.012,fPl);
+  for(var kn=0;kn<3;kn++)cy(osx2+0.08,0.95,osz2-0.06+kn*0.03,0.01,0.012,fSt2,6);
+
+  // ---- FUNCTION GENERATOR (right-back) ----
+  bx(tx+0.8,0.81,tz+0.3,0.14,0.07,0.18,fPl);
+  bx(tx+0.8,0.85,tz+0.35,0.08,0.04,0.01,fSc);
+  cy(tx+0.76,0.84,tz+0.22,0.008,0.012,fSt2,6);
+  cy(tx+0.84,0.84,tz+0.22,0.008,0.012,fSt2,6);
+
+  // ---- LOGIC ANALYZER ----
+  bx(tx+0.82,0.785,tz+0.05,0.08,0.012,0.05,fBk);
+  bx(tx+0.87,0.785,tz+0.05,0.008,0.012,0.03,fSt2);
+
+  // ---- DESKTOP PC ----
+  bx(tx-0.3,0.94,tz+0.32,0.46,0.28,0.018,fBk);
+  bx(tx-0.3,0.94,tz+0.33,0.42,0.24,0.005,fScOn);
+  cy(tx-0.3,0.8,tz+0.26,0.018,0.12,fSt2);
+  bx(tx-0.3,0.77,tz+0.26,0.14,0.008,0.08,fBk);
+  bx(tx-0.05,0.775,tz+0.05,0.3,0.008,0.12,fPk);
+  bx(tx+0.22,0.775,tz+0.05,0.04,0.012,0.065,fBk);
+  bx(tx+0.38,0.85,tz+0.12,0.1,0.24,0.18,fBk);
+
+  // ---- WIRE BUNDLE ----
+  for(var wi=0;wi<5;wi++)
+    cy(tx-0.55+wi*0.015,0.77,tz+0.3,0.002,0.08,[fR,fBl,fY,fG,fW][wi],4);
+
+  // ---- IC BOX ----
+  bx(tx-0.6,0.775,tz+0.18,0.1,0.015,0.08,fPl);
+  for(var ic=0;ic<6;ic++)
+    bx(tx-0.63+(ic%3)*0.022,0.788,tz+0.16+(ic>>1)*0.022,0.016,0.005,0.01,fIC);
+
+  // ---- PATCH CORDS ----
+  for(var pc=0;pc<3;pc++)
+    cy(tx+0.86+pc*0.008,0.77,tz-0.15+pc*0.04,0.002,0.12,[fR,fBl,fY][pc],4);
+
+  // ---- CALCULATOR ----
+  bx(tx+0.45,0.775,tz-0.2,0.07,0.008,0.12,fBk);
+
+  // ---- NOTEBOOK ----
+  bx(tx-0.5,0.77,tz+0.05,0.16,0.008,0.22,fBl);
+  for(var nl=0;nl<4;nl++)bx(tx-0.5,0.777,tz-0.04+nl*0.04,0.13,0.002,0.008,B(0xFFFFFF));
+
+  // ---- PEN ----
+  cy(tx-0.42,0.775,tz+0.15,0.003,0.12,fBk,5);
+  cy(tx-0.4,0.775,tz+0.15,0.003,0.12,fBl,5);
+});
+
+// ===================== INSTRUCTOR STATION =====================
+var ix2=RW/4,iz2=RD/2-2;
+bx(ix2,0.78,iz2,2.4,0.045,1.1,fWd2);
+cy(ix2-1.05,0.39,iz2-0.45,0.025,0.78,fSt);
+cy(ix2+1.05,0.39,iz2-0.45,0.025,0.78,fSt);
+cy(ix2-1.05,0.39,iz2+0.45,0.025,0.78,fSt);
+cy(ix2+1.05,0.39,iz2+0.45,0.025,0.78,fSt);
+bx(ix2,0.18,iz2-0.45,2.1,0.025,0.025,fSt);
+bx(ix2,0.18,iz2+0.45,2.1,0.025,0.025,fSt);
+bx(ix2+0.85,0.42,iz2,0.45,0.65,0.55,fWd2);
+bx(ix2+0.85,0.33,iz2+0.28,0.4,0.18,0.01,fPk);
+bx(ix2+0.85,0.52,iz2+0.28,0.4,0.18,0.01,fPk);
+
+// Instructor oscilloscope
+bx(ix2-0.55,0.89,iz2,0.28,0.16,0.22,fPl);
+bx(ix2-0.55,0.97,iz2+0.06,0.2,0.12,0.01,fSc);
+for(var wv=0;wv<12;wv++)
+  bx(ix2-0.67+wv*0.014,0.95+Math.sin(wv*0.55)*0.03,iz2+0.065,0.01,0.004,0.004,B(0x22DD44));
+for(var bt=0;bt<8;bt++)bx(ix2-0.67+bt*0.022,0.97,iz2-0.08,0.018,0.01,0.012,fPl);
+
+// Instructor trainer
+bx(ix2+0.15,0.83,iz2,0.35,0.035,0.26,fPk);
+bx(ix2+0.15,0.85,iz2,0.33,0.008,0.24,fBk);
+for(var s=0;s<10;s++){
+  bx(ix2+0.02+s*0.028,0.865,iz2-0.08,0.012,0.016,0.018,fPl);
+  bx(ix2+0.02+s*0.028,0.878,iz2-0.08,0.008,0.006,0.008,[fR,fG,fR,fG,fBl,fY,fR,fG,fBl,fY][s]);
+}
+
+// Instructor PC
+bx(ix2-0.15,0.95,iz2+0.38,0.48,0.3,0.018,fBk);
+bx(ix2-0.15,0.95,iz2+0.39,0.44,0.26,0.005,fScOn);
+cy(ix2-0.15,0.81,iz2+0.32,0.022,0.14,fSt2);
+bx(ix2-0.35,0.8,iz2+0.1,0.35,0.008,0.14,fPk);
+bx(ix2+0.15,0.8,iz2+0.1,0.04,0.015,0.06,fBk);
+bx(ix2+0.75,0.85,iz2+0.28,0.12,0.28,0.2,fBk);
+
+// Document camera
+cy(ix2-0.9,0.8,iz2+0.28,0.05,0.008,fSt,10);
+cy(ix2-0.9,0.96,iz2+0.28,0.012,0.32,fSt);
+sp(ix2-0.9,1.13,iz2+0.28,0.025,fBk);
+
+// Instructor chair
+bx(ix2,0.45,iz2+0.75,0.48,0.045,0.48,fBk);
+bx(ix2,0.72,iz2+1,0.46,0.52,0.035,fBk);
+cy(ix2,0.22,iz2+0.75,0.032,0.26,fSt);
+cy(ix2,0.035,iz2+0.75,0.24,0.035,fSt);
+
+// ===================== PLANTS =====================
+[[-RW/2+0.8,-RD/2+0.8],[RW/2-0.8,-RD/2+0.8],[-RW/2+0.8,RD/2-0.8],[RW/2-0.8,RD/2-0.8]].forEach(function(c){
+  bx(c[0],0.3,c[1],0.3,0.6,0.3,L(0x9E5B20));
+  cy(c[0],0.72,c[1],0.12,0.2,L(0x1E7A3A));
+  sp(c[0],0.95,c[1],0.15,L(0x1D8B2E));
+  sp(c[0]-0.08,1.08,c[1]+0.06,0.07,L(0x2DC842));
+  sp(c[0]+0.06,1.1,c[1]-0.05,0.05,L(0x1D8B2E));
+});
+
+// ===================== TOOLBOXES =====================
+bx(-7,0.12,-RD/2+0.7,0.28,0.24,0.45,B(0xDD1111));
+bx(-6.5,0.08,-RD/2+0.7,0.22,0.16,0.35,fPk);
+
+// ===================== LIGHTING — LOW INTENSITY =====================
+scene.add(new THREE.AmbientLight(0x555566,0.15));
+scene.add(new THREE.HemisphereLight(0x8899BB,0x6B4914,0.15));
+
+var sun=new THREE.DirectionalLight(0xFFEECC,0.3);
+sun.position.set(15,18,5);scene.add(sun);
+
+var winL=new THREE.DirectionalLight(0x6699BB,0.15);
+winL.position.set(RW+3,3,0);scene.add(winL);
+
+lps.forEach(function(p){
+  var l=new THREE.PointLight(0xFFF0D0,2.5,8);
+  l.position.set(p[0],RH-0.5,p[1]);scene.add(l);
+});
+
+// ===================== CONTROLS =====================
+var keys={},spd=0.12,fsd=0.3;
+document.addEventListener('keydown',function(e){keys[e.code]=true;if(['Space','KeyC'].indexOf(e.code)>=0)e.preventDefault()});
+document.addEventListener('keyup',function(e){keys[e.code]=false});
+R.domElement.addEventListener('click',function(){R.domElement.requestPointerLock()});
+document.addEventListener('pointerlockchange',function(){locked=!!document.pointerLockElement});
+document.addEventListener('mousemove',function(e){
+  if(!locked)return;
+  yaw-=e.movementX*0.002;pitch-=e.movementY*0.002;
+  pitch=Math.max(-1.5,Math.min(1.5,pitch));
+});
+(function anim(){
+  requestAnimationFrame(anim);
+  var dx=0,dy=0,dz=0;
+  if(keys.KeyW)dz=-1;if(keys.KeyS)dz=1;if(keys.KeyA)dx=-1;if(keys.KeyD)dx=1;
+  if(keys.Space)dy=1;if(keys.KeyC)dy=-1;
+  if(dx||dy||dz){
+    var ln=Math.sqrt(dx*dx+dy*dy+dz*dz);dx/=ln;dy/=ln;dz/=ln;
+    var s=keys.ShiftLeft?fsd:spd;
+    var si=Math.sin(yaw),co=Math.cos(yaw);
+    cam.position.x+=(dx*co-dz*si)*s;
+    cam.position.z+=(dx*si+dz*co)*s;
+    cam.position.y+=dy*s;
+  }
+  cam.quaternion.setFromEuler(new THREE.Euler(pitch,yaw,0,'YXZ'));
+  R.render(scene,cam);
+})();
+window.addEventListener('resize',function(){cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();R.setSize(innerWidth,innerHeight)});
+</script>
+</body>
+</html>
