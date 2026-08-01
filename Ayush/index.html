@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AR Digital Electronics Lab - Hole Engine Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; background: #1a1a1a; }
+    canvas { display: block; }
+
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: #ccc;
+      font: 12px/1.5 monospace;
+      background: rgba(0, 0, 0, 0.55);
+      padding: 6px 10px;
+      border-radius: 4px;
+      pointer-events: none;
+    }
+
+    #toolbar {
+      position: absolute;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: flex;
+      gap: 8px;
+    }
+
+    #toolbar button {
+      padding: 8px 18px;
+      font: 600 14px monospace;
+      color: #fff;
+      background: #2b2f3a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #toolbar button:hover { background: #3a3f4c; }
+    #toolbar button.active { background: #2266ff; border-color: #4a8bff; }
+
+    #toolbar select {
+      padding: 8px 10px;
+      font: 600 13px monospace;
+      color: #fff;
+      background: #2b2f3a;
+      border: 1px solid #444;
+      border-radius: 6px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    #toolbar select:hover { background: #3a3f4c; }
+    #toolbar option { background: #2b2f3a; color: #fff; }
+
+    #ledToolbar {
+      position: absolute;
+      top: 56px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid #444;
+      border-radius: 6px;
+    }
+
+    #ledToolbar .led-label {
+      color: #ccc;
+      font: 600 12px monospace;
+      margin-right: 4px;
+    }
+
+    #ledToolbar .swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 2px solid #555;
+      background: var(--c);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    #ledToolbar .swatch:hover { border-color: #fff; }
+    #ledToolbar .swatch.active { border-color: #fff; box-shadow: 0 0 6px #fff; }
+
+    #wireToolbar {
+      position: absolute;
+      top: 56px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      background: rgba(0, 0, 0, 0.65);
+      border: 1px solid #444;
+      border-radius: 6px;
+    }
+
+    #wireToolbar .wire-label {
+      color: #ccc;
+      font: 600 12px monospace;
+      margin-right: 4px;
+    }
+
+    #wireToolbar .swatch {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 2px solid #555;
+      background: var(--c);
+      cursor: pointer;
+      padding: 0;
+    }
+
+    #wireToolbar .swatch:hover { border-color: #fff; }
+    #wireToolbar .swatch.active { border-color: #fff; box-shadow: 0 0 6px #fff; }
+
+    #status {
+      position: absolute;
+      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      padding: 8px 14px;
+      font: 600 13px monospace;
+      border-radius: 6px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #eee;
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
+    #status[data-kind="success"] { color: #22cc55; }
+    #status[data-kind="error"] { color: #ff5555; }
+    #status[data-kind="info"] { color: #ffd166; }
+  </style>
+</head>
+<body>
+  <div id="info">Breadboard &mdash; 630 terminal + 252 power-rail holes &middot; gray spheres r = 0.4 mm</div>
+  <div id="toolbar">
+    <button id="icBtn" title="Place a DIP IC (pick a part, click once on a valid start position, Esc to cancel)">IC</button>
+    <select id="icPartSelect" title="Select IC type">
+      <option value="7400">7400 NAND</option>
+      <option value="7402">7402 NOR</option>
+      <option value="7404">7404 Inverter</option>
+      <option value="7408">7408 AND</option>
+      <option value="7432">7432 OR</option>
+      <option value="7411">7411 Triple AND</option>
+      <option value="74151">74151 MUX</option>
+      <option value="7486">7486 XOR</option>
+    </select>
+    <button id="wireBtn" title="Connect two holes with a jumper wire (pick a color, click start and end hole)">Wire</button>
+    <button id="ledBtn" title="Place a 5mm LED (pick a color, click anode then cathode hole)">LED</button>
+    <button id="powerBtn" title="Connect the 5V power supply (red + and black - wires) to breadboard holes">Power</button>
+    <button id="undoBtn" title="Undo the last placed component (or press Backspace)">Undo</button>
+    <button id="clearBtn" title="Remove all placed components">Clear</button>
+  </div>
+  <div id="wireToolbar">
+    <span class="wire-label">Wire</span>
+    <button class="swatch" data-color="red" data-hex="#e53935" style="--c:#e53935" title="red"></button>
+    <button class="swatch" data-color="blue" data-hex="#2962ff" style="--c:#2962ff" title="blue"></button>
+    <button class="swatch" data-color="green" data-hex="#2e7d32" style="--c:#2e7d32" title="green"></button>
+    <button class="swatch" data-color="yellow" data-hex="#f9a825" style="--c:#f9a825" title="yellow"></button>
+    <button class="swatch" data-color="black" data-hex="#1a1a1a" style="--c:#1a1a1a" title="black"></button>
+    <button class="swatch" data-color="white" data-hex="#f5f5f5" style="--c:#f5f5f5" title="white"></button>
+    <button class="swatch" data-color="orange" data-hex="#ef6c00" style="--c:#ef6c00" title="orange"></button>
+    <button class="swatch" data-color="purple" data-hex="#6a1b9a" style="--c:#6a1b9a" title="purple"></button>
+    <button class="swatch" data-color="brown" data-hex="#6d4c41" style="--c:#6d4c41" title="brown"></button>
+  </div>
+  <div id="ledToolbar">
+    <span class="led-label">LED</span>
+    <button class="swatch" data-color="red" data-hex="#ff3b30" style="--c:#ff3b30" title="red"></button>
+    <button class="swatch" data-color="yellow" data-hex="#ffd60a" style="--c:#ffd60a" title="yellow"></button>
+    <button class="swatch" data-color="green" data-hex="#34c759" style="--c:#34c759" title="green"></button>
+    <button class="swatch" data-color="blue" data-hex="#2979ff" style="--c:#2979ff" title="blue"></button>
+    <button class="swatch" data-color="white" data-hex="#ffffff" style="--c:#ffffff" title="white"></button>
+  </div>
+  <div id="status" data-kind="info">Click the IC, Wire, LED or Power button to enable placement</div>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
