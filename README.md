@@ -1,8 +1,8 @@
-# 🕶️ AR Project — Digital Electronics & AR Experiments
+# 🕶️ AR LAB IIT KANPUR — Digital Electronics & AR Experiments
 
 Welcome to the **AR Project** repository! This repository contains WebGL & WebXR Augmented Reality experiments, interactive solderless breadboard simulators, and 3D digital electronics lab components.
 
-🌐 **Live Demo (Ayush Lab)**: [https://ayushdixit1-av.github.io/ar-project/Ayush/](https://ayushdixit1-av.github.io/ar-project/Ayush/)
+🌐 **Live Demo (AR Lab)**: [https://ayushdixit1-av.github.io/ar-project/Ayush/](https://ayushdixit1-av.github.io/ar-project/Ayush/)
 
 ---
 
