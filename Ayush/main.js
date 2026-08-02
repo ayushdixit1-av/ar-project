@@ -10,6 +10,7 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 import { BreadboardConfig } from './BreadboardConfig.js';
 import { BreadboardBody } from './BreadboardBody.js';
@@ -77,9 +78,10 @@ function attachViewer(group) {
   camera.position.set(0, 220, 320);
   camera.lookAt(0, 0, 0);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.xr.enabled = true;
   document.body.appendChild(renderer.domElement);
 
   const controls = new OrbitControls(camera, renderer.domElement);
@@ -88,12 +90,18 @@ function attachViewer(group) {
   controls.target.set(0, 0, 0);
   controls.update();
 
-  function animate() {
-    requestAnimationFrame(animate);
-    controls.update();
+  renderer.setAnimationLoop(() => {
+    if (!renderer.xr.isPresenting) {
+      controls.update();
+    }
     renderer.render(scene, camera);
-  }
-  animate();
+  });
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
 
   return { renderer, controls, scene, camera, group };
 }
@@ -242,6 +250,61 @@ function setupLabels(scene) {
   }
 }
 
+function setupAR(viewer, boardContainer) {
+  const { renderer, scene } = viewer;
+  const arBtn = document.getElementById('arBtn');
+  const statusEl = document.getElementById('status');
+
+  if (!arBtn) return;
+
+  if (typeof navigator !== 'undefined' && 'xr' in navigator) {
+    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+      if (supported) {
+        const dummyARButton = ARButton.createButton(renderer, {
+          optionalFeatures: ['dom-overlay'],
+          domOverlay: { root: document.body }
+        });
+        dummyARButton.style.display = 'none';
+        document.body.appendChild(dummyARButton);
+
+        arBtn.addEventListener('click', () => {
+          dummyARButton.click();
+        });
+
+        renderer.xr.addEventListener('sessionstart', () => {
+          arBtn.classList.add('active');
+          arBtn.textContent = '✕ Exit AR';
+          scene.background = null;
+          boardContainer.scale.set(0.001, 0.001, 0.001);
+          boardContainer.position.set(0, -0.15, -0.4);
+          if (statusEl) showStatus(statusEl, 'AR Session Active - View breadboard in real space', 'success');
+        });
+
+        renderer.xr.addEventListener('sessionend', () => {
+          arBtn.classList.remove('active');
+          arBtn.innerHTML = '✨ View in AR';
+          scene.background = new THREE.Color(0x3a414c);
+          boardContainer.scale.set(1, 1, 1);
+          boardContainer.position.set(0, 0, 0);
+          if (statusEl) showStatus(statusEl, 'Exited AR session', 'info');
+        });
+      } else {
+        arBtn.addEventListener('click', () => {
+          if (statusEl) showStatus(statusEl, 'WebXR AR is not supported on this device/browser (Try Chrome on Android with ARCore).', 'error');
+        });
+      }
+    }).catch((err) => {
+      arBtn.addEventListener('click', () => {
+        if (statusEl) showStatus(statusEl, 'WebXR AR query error: ' + (err.message || err), 'error');
+      });
+    });
+  } else {
+    arBtn.addEventListener('click', () => {
+      if (statusEl) showStatus(statusEl, 'WebXR is not supported by your browser.', 'error');
+    });
+  }
+}
+
 const holes = HoleGenerator.generate();
 const report = Validator.validateAndFix(holes);
 printReport(report, 'HOLE ENGINE VERIFICATION REPORT');
@@ -282,12 +345,18 @@ printReport(
 
 const allHoles = [...holes, ...power.holes];
 const field = buildSphereField(allHoles);
+
+const boardContainer = new THREE.Group();
+boardContainer.name = 'boardContainer';
+boardContainer.add(field);
+boardContainer.add(body);
+
 console.log(
   `[OUTPUT] ${holes.length} terminal + ${power.holes.length} power-rail holes; ` +
   `sphere field contains ${field.children.length} meshes.`
 );
 
-const viewer = attachViewer(field);
+const viewer = attachViewer(boardContainer);
 
 let icTool = null;
 let wireTool = null;
@@ -297,8 +366,8 @@ let lastActiveTool = null;
 if (viewer) {
   const statusEl = document.getElementById('status');
   icTool = setupICPlacement(viewer, holes, field);
-  setupLabels(viewer.scene);
-  viewer.scene.add(body);
+  setupLabels(boardContainer);
+  setupAR(viewer, boardContainer);
   const wireSetup = setupWireTool(viewer, field, allHoles, statusEl);
   wireTool = wireSetup.tool;
   const ledSetup = setupLEDTool(viewer, field, allHoles, statusEl);
@@ -354,4 +423,4 @@ if (viewer) {
   document.getElementById('clearBtn').addEventListener('click', () => activePlacementTool().resetAll());
 }
 
-export { holes, field, viewer, icTool, wireTool, ledTool, powerTool, body };
+export { holes, field, viewer, icTool, wireTool, ledTool, powerTool, body, boardContainer };
