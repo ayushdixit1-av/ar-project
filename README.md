@@ -49,6 +49,7 @@ graph TD
 | Folder | Module / Feature Description |
 | :--- | :--- |
 | **`Ayush/`** | 3D Interactive Breadboard Simulator with WebXR AR support (`✨ View in AR`), IC placement, wire routing, LED components, and power supply management. |
+| **`Amey/`** | Contributor module. |
 | **`Aadvik/`** | Experimental AR modules & lab resources. |
 | **`Amar/`** | Contributor module. |
 | **`Devanshi/`** | Contributor module. |
