@@ -44,6 +44,27 @@
     #toolbar button:hover { background: #3a3f4c; }
     #toolbar button.active { background: #2266ff; border-color: #4a8bff; }
 
+    #arBtn {
+      background: linear-gradient(135deg, #7928ca, #ff0080) !important;
+      border-color: #a855f7 !important;
+      color: #fff !important;
+      font-weight: 700 !important;
+      box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
+      transition: all 0.2s ease;
+    }
+
+    #arBtn:hover {
+      background: linear-gradient(135deg, #8b31e0, #ff1a8c) !important;
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.7);
+      transform: translateY(-1px);
+    }
+
+    #arBtn.active {
+      background: #ff0080 !important;
+      border-color: #ff66c4 !important;
+      box-shadow: 0 0 18px rgba(255, 0, 128, 0.8);
+    }
+
     #toolbar select {
       padding: 8px 10px;
       font: 600 13px monospace;
@@ -149,6 +170,7 @@
 <body>
   <div id="info">Breadboard &mdash; 630 terminal + 252 power-rail holes &middot; gray spheres r = 0.4 mm</div>
   <div id="toolbar">
+    <button id="arBtn" title="View breadboard in Augmented Reality (AR)">✨ View in AR</button>
     <button id="icBtn" title="Place a DIP IC (pick a part, click once on a valid start position, Esc to cancel)">IC</button>
     <select id="icPartSelect" title="Select IC type">
       <option value="7400">7400 NAND</option>
