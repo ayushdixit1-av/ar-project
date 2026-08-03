@@ -2,6 +2,15 @@
 
 An interactive 3D Digital Electronics Laboratory Trainer for logic design experiments, built with React, Three.js, and TypeScript. It features realistic 74xx-series IC models, an internal X-Ray silicon die view, real-time Boolean logic simulation, virtual multimeter probes, automatic truth table verification, and an AI Professor for guided diagnosis.
 
+🔗 **Live demo:** https://ayushdixit1-av.github.io/ar-project/Shivam/
+
+> Note: the live demo is a static build. The AI Professor chat feature calls a small backend server for the Gemini API, which isn't available on GitHub Pages (static hosting only) — that feature only works when running the project locally or on a host with a Node.js backend.
+
+## Project Layout
+
+- `index.html`, `assets/` — the production build served by GitHub Pages
+- `source/` — the full application source code (React + TypeScript), for local development
+
 ## Features
 
 - 🎛️ Realistic 3D digital logic trainer kit rendered in the browser
@@ -28,9 +37,10 @@ An interactive 3D Digital Electronics Laboratory Trainer for logic design experi
 
 ## Running Locally
 
-1. **Clone the repo and install dependencies**
+1. **Navigate into the source folder and install dependencies**
 
    ```bash
+   cd source
    npm install
    ```
 
