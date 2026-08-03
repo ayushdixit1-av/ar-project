@@ -3,176 +3,464 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AR Digital Electronics Lab - Hole Engine Viewer</title>
+  <title>AR Digital Electronics Lab</title>
+  <meta name="description" content="Interactive AR breadboard simulator for digital electronics — place ICs, wires, LEDs, and power supplies in an augmented reality environment." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    body { margin: 0; overflow: hidden; background: #1a1a1a; }
-    canvas { display: block; }
+    /* ─── Reset & Base ─────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    #info {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      color: #ccc;
-      font: 12px/1.5 monospace;
-      background: rgba(0, 0, 0, 0.55);
-      padding: 6px 10px;
-      border-radius: 4px;
-      pointer-events: none;
+    :root {
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --glass-bg: rgba(18, 20, 28, 0.72);
+      --glass-border: rgba(255, 255, 255, 0.10);
+      --glass-blur: blur(18px) saturate(1.6);
+      --btn-bg: rgba(255, 255, 255, 0.07);
+      --btn-hover: rgba(255, 255, 255, 0.14);
+      --btn-active-bg: rgba(34, 102, 255, 0.85);
+      --btn-active-border: rgba(74, 139, 255, 0.9);
+      --accent: #2266ff;
+      --accent-glow: rgba(34, 102, 255, 0.35);
+      --text-primary: #f0f2ff;
+      --text-muted: #8b92b4;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 16px;
+      --transition: 0.18s cubic-bezier(0.4, 0, 0.2, 1);
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+      --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.55);
     }
 
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: #0d0f17;
+      font-family: var(--font);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    canvas { display: block; }
+
+    /* ─── Info Panel ──────────────────────────────────────────────── */
+    #info {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.3px;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+      pointer-events: none;
+      max-width: 220px;
+      line-height: 1.4;
+      box-shadow: var(--shadow-sm);
+    }
+
+    /* ─── Primary Toolbar ─────────────────────────────────────────── */
     #toolbar {
       position: absolute;
-      top: 12px;
+      top: 14px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
       display: flex;
-      gap: 8px;
+      align-items: center;
+      gap: 6px;
+      padding: 6px;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.06);
+      flex-wrap: nowrap;
     }
 
-    #toolbar button {
-      padding: 8px 18px;
-      font: 600 14px monospace;
-      color: #fff;
-      background: #2b2f3a;
-      border: 1px solid #444;
-      border-radius: 6px;
+    /* Group dividers */
+    .toolbar-sep {
+      width: 1px;
+      height: 26px;
+      background: var(--glass-border);
+      border-radius: 1px;
+      flex-shrink: 0;
+    }
+
+    /* ─── Base Button ─────────────────────────────────────────────── */
+    #toolbar button,
+    #toolbar .btn {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 14px;
+      font-family: var(--font);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: var(--btn-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
       cursor: pointer;
       user-select: none;
+      white-space: nowrap;
+      transition: background var(--transition), border-color var(--transition),
+                  box-shadow var(--transition), transform var(--transition),
+                  color var(--transition);
+      outline: none;
+      -webkit-tap-highlight-color: transparent;
     }
 
-    #toolbar button:hover { background: #3a3f4c; }
-    #toolbar button.active { background: #2266ff; border-color: #4a8bff; }
-
-    #arBtn {
-      background: linear-gradient(135deg, #7928ca, #ff0080) !important;
-      border-color: #a855f7 !important;
-      color: #fff !important;
-      font-weight: 700 !important;
-      box-shadow: 0 0 12px rgba(168, 85, 247, 0.4);
-      transition: all 0.2s ease;
+    #toolbar button svg,
+    #toolbar .btn svg {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      opacity: 0.85;
+      transition: opacity var(--transition);
     }
 
-    #arBtn:hover {
-      background: linear-gradient(135deg, #8b31e0, #ff1a8c) !important;
-      box-shadow: 0 0 16px rgba(168, 85, 247, 0.7);
+    #toolbar button:hover {
+      background: var(--btn-hover);
+      border-color: rgba(255,255,255,0.18);
       transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    }
+    #toolbar button:hover svg { opacity: 1; }
+
+    #toolbar button:active {
+      transform: translateY(0);
+      box-shadow: none;
     }
 
-    #arBtn.active {
-      background: #ff0080 !important;
-      border-color: #ff66c4 !important;
-      box-shadow: 0 0 18px rgba(255, 0, 128, 0.8);
-    }
-
-    #toolbar select {
-      padding: 8px 10px;
-      font: 600 13px monospace;
+    #toolbar button.active {
+      background: var(--btn-active-bg);
+      border-color: var(--btn-active-border);
+      box-shadow: 0 0 0 1px var(--btn-active-border), 0 4px 16px var(--accent-glow);
       color: #fff;
-      background: #2b2f3a;
-      border: 1px solid #444;
-      border-radius: 6px;
+    }
+    #toolbar button.active svg { opacity: 1; }
+
+    /* ─── IC Select Dropdown ──────────────────────────────────────── */
+    #icPartSelect {
+      appearance: none;
+      -webkit-appearance: none;
+      padding: 7px 28px 7px 12px;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      background: var(--btn-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%238b92b4' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
       cursor: pointer;
-      user-select: none;
+      transition: background var(--transition), border-color var(--transition);
+      max-width: 140px;
+    }
+    #icPartSelect:hover {
+      background-color: var(--btn-hover);
+      border-color: rgba(255,255,255,0.18);
+    }
+    #icPartSelect:focus { outline: none; border-color: var(--accent); }
+    #icPartSelect option { background: #1a1d2e; color: var(--text-primary); }
+
+    /* ─── AR Button (special) ─────────────────────────────────────── */
+    #arBtn {
+      background: linear-gradient(135deg, #7928ca 0%, #c0227d 60%, #ff0080 100%) !important;
+      border-color: rgba(168, 85, 247, 0.5) !important;
+      box-shadow: 0 0 16px rgba(168, 85, 247, 0.3), inset 0 1px 0 rgba(255,255,255,0.2) !important;
+      padding: 7px 16px !important;
+      font-weight: 700 !important;
+    }
+    #arBtn:hover {
+      background: linear-gradient(135deg, #8b31e0 0%, #d4287f 60%, #ff1a8c 100%) !important;
+      box-shadow: 0 0 24px rgba(168, 85, 247, 0.55), 0 4px 16px rgba(0,0,0,0.3) !important;
+      transform: translateY(-2px) !important;
+    }
+    #arBtn.active {
+      background: linear-gradient(135deg, #ff0080, #7928ca) !important;
+      border-color: #ff66c4 !important;
+      box-shadow: 0 0 22px rgba(255, 0, 128, 0.7) !important;
     }
 
-    #toolbar select:hover { background: #3a3f4c; }
-    #toolbar option { background: #2b2f3a; color: #fff; }
+    /* ─── Undo / Clear (danger-neutral) ──────────────────────────── */
+    #undoBtn:hover { background: rgba(255, 180, 0, 0.12); border-color: rgba(255,180,0,0.35); color: #ffd166; }
+    #clearBtn:hover { background: rgba(255, 80, 80, 0.12); border-color: rgba(255,80,80,0.35); color: #ff8888; }
 
-    #ledToolbar {
+    /* ─── Secondary Toolbars (LED / Wire Color Pickers) ───────────── */
+    #ledToolbar, #wireToolbar {
       position: absolute;
-      top: 56px;
+      top: 68px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
       display: none;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      background: rgba(0, 0, 0, 0.65);
-      border: 1px solid #444;
-      border-radius: 6px;
+      gap: 8px;
+      padding: 8px 14px;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.05);
+      animation: slideDown 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
     }
 
-    #ledToolbar .led-label {
-      color: #ccc;
-      font: 600 12px monospace;
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
+      to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+    }
+
+    .led-label, .wire-label {
+      color: var(--text-muted);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
       margin-right: 4px;
     }
 
-    #ledToolbar .swatch {
-      width: 22px;
-      height: 22px;
-      border-radius: 4px;
-      border: 2px solid #555;
+    /* Color swatches */
+    .swatch {
+      position: relative;
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2px solid rgba(255,255,255,0.2);
       background: var(--c);
       cursor: pointer;
       padding: 0;
+      transition: border-color var(--transition), box-shadow var(--transition),
+                  transform var(--transition);
+      overflow: hidden;
+      flex-shrink: 0;
     }
-
-    #ledToolbar .swatch:hover { border-color: #fff; }
-    #ledToolbar .swatch.active { border-color: #fff; box-shadow: 0 0 6px #fff; }
-
-    #wireToolbar {
+    .swatch::after {
+      content: '';
       position: absolute;
-      top: 56px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 10;
-      display: none;
+      inset: 0;
+      background: rgba(255,255,255,0.15);
+      opacity: 0;
+      transition: opacity var(--transition);
+      border-radius: inherit;
+    }
+    .swatch:hover {
+      border-color: rgba(255,255,255,0.7);
+      transform: scale(1.15);
+      box-shadow: 0 0 10px rgba(255,255,255,0.3);
+    }
+    .swatch:hover::after { opacity: 1; }
+    .swatch.active {
+      border-color: #fff;
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.3), 0 0 12px rgba(255,255,255,0.4);
+      transform: scale(1.1);
+    }
+    /* Checkmark for selected swatch */
+    .swatch.active::before {
+      content: '✓';
+      position: absolute;
+      inset: 0;
+      display: flex;
       align-items: center;
-      gap: 6px;
-      padding: 6px 10px;
-      background: rgba(0, 0, 0, 0.65);
-      border: 1px solid #444;
-      border-radius: 6px;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: rgba(255,255,255,0.9);
+      text-shadow: 0 1px 3px rgba(0,0,0,0.7);
+      line-height: 1;
+      padding-top: 1px;
     }
 
-    #wireToolbar .wire-label {
-      color: #ccc;
-      font: 600 12px monospace;
-      margin-right: 4px;
-    }
-
-    #wireToolbar .swatch {
-      width: 22px;
-      height: 22px;
-      border-radius: 4px;
-      border: 2px solid #555;
-      background: var(--c);
-      cursor: pointer;
-      padding: 0;
-    }
-
-    #wireToolbar .swatch:hover { border-color: #fff; }
-    #wireToolbar .swatch.active { border-color: #fff; box-shadow: 0 0 6px #fff; }
-
+    /* ─── Status Bar ──────────────────────────────────────────────── */
     #status {
       position: absolute;
-      bottom: 14px;
+      bottom: 18px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 10;
-      padding: 8px 14px;
-      font: 600 13px monospace;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.7);
-      color: #eee;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 18px;
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+      border-radius: 100px;
+      background: var(--glass-bg);
+      backdrop-filter: var(--glass-blur);
+      -webkit-backdrop-filter: var(--glass-blur);
+      border: 1px solid var(--glass-border);
+      color: var(--text-muted);
       pointer-events: none;
       white-space: nowrap;
+      box-shadow: var(--shadow-sm);
+      transition: color var(--transition), border-color var(--transition),
+                  box-shadow var(--transition), background var(--transition);
+      max-width: calc(100vw - 32px);
+    }
+    #status::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      flex-shrink: 0;
+      box-shadow: 0 0 6px currentColor;
+      transition: background var(--transition), box-shadow var(--transition);
     }
 
-    #status[data-kind="success"] { color: #22cc55; }
-    #status[data-kind="error"] { color: #ff5555; }
-    #status[data-kind="info"] { color: #ffd166; }
+    #status[data-kind="success"] {
+      color: #34d399;
+      border-color: rgba(52, 211, 153, 0.3);
+      box-shadow: 0 0 20px rgba(52, 211, 153, 0.15);
+    }
+    #status[data-kind="error"] {
+      color: #f87171;
+      border-color: rgba(248, 113, 113, 0.3);
+      box-shadow: 0 0 20px rgba(248, 113, 113, 0.15);
+    }
+    #status[data-kind="info"] {
+      color: #fbbf24;
+      border-color: rgba(251, 191, 36, 0.3);
+      box-shadow: 0 0 20px rgba(251, 191, 36, 0.12);
+    }
+
+    /* ─── Custom Tooltip ──────────────────────────────────────────── */
+    [data-tip] { position: relative; }
+    [data-tip]::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 10px);
+      left: 50%;
+      transform: translateX(-50%) scale(0.92);
+      transform-origin: bottom center;
+      background: #1e2132;
+      border: 1px solid rgba(255,255,255,0.12);
+      color: #e4e7ff;
+      font-family: var(--font);
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.4;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      white-space: nowrap;
+      max-width: 220px;
+      white-space: normal;
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+    }
+    [data-tip]:hover::after {
+      opacity: 1;
+      transform: translateX(-50%) scale(1);
+    }
+
+    /* ─── Responsive ──────────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      #info { display: none; }
+
+      #toolbar {
+        top: auto;
+        bottom: 70px;
+        left: 50%;
+        transform: translateX(-50%);
+        flex-wrap: wrap;
+        justify-content: center;
+        max-width: calc(100vw - 16px);
+        padding: 8px;
+        gap: 6px;
+        border-radius: var(--radius-lg);
+      }
+
+      #toolbar button { padding: 9px 13px; font-size: 12px; }
+      #icPartSelect { max-width: 120px; font-size: 11px; }
+
+      #ledToolbar, #wireToolbar {
+        bottom: 200px;
+        top: auto;
+        transform: translateX(-50%);
+        animation: slideUp 0.22s cubic-bezier(0.4, 0, 0.2, 1) both;
+        max-width: calc(100vw - 16px);
+        flex-wrap: wrap;
+        justify-content: center;
+      }
+      @keyframes slideUp {
+        from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+        to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+      }
+
+      #status {
+        bottom: 14px;
+        font-size: 11px;
+        padding: 8px 14px;
+      }
+      .toolbar-sep { display: none; }
+    }
+
+    @media (max-width: 480px) {
+      #toolbar button { padding: 8px 10px; font-size: 11px; gap: 4px; }
+      #toolbar button span { display: none; }
+      #arBtn span { display: inline !important; }
+    }
+
+    /* ─── Focus visible (accessibility) ──────────────────────────── */
+    #toolbar button:focus-visible,
+    #icPartSelect:focus-visible,
+    .swatch:focus-visible {
+      outline: 2px solid rgba(34,102,255,0.7);
+      outline-offset: 2px;
+    }
   </style>
 </head>
 <body>
-  <div id="info">Breadboard &mdash; 630 terminal + 252 power-rail holes &middot; gray spheres r = 0.4 mm</div>
-  <div id="toolbar">
-    <button id="arBtn" title="View breadboard in Augmented Reality (AR)">✨ View in AR</button>
-    <button id="icBtn" title="Place a DIP IC (pick a part, click once on a valid start position, Esc to cancel)">IC</button>
-    <select id="icPartSelect" title="Select IC type">
+  <!-- Info panel -->
+  <div id="info">Breadboard &mdash; 630 terminal + 252 power-rail holes &middot; r&thinsp;=&thinsp;0.4&thinsp;mm</div>
+
+  <!-- Primary toolbar -->
+  <div id="toolbar" role="toolbar" aria-label="Circuit tools">
+
+    <!-- AR Button -->
+    <button id="arBtn"
+      data-tip="View breadboard in Augmented Reality"
+      aria-label="View in AR">
+      <!-- Sparkles icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 2L13.5 8.5L20 10L13.5 11.5L12 18L10.5 11.5L4 10L10.5 8.5L12 2Z"/>
+        <path d="M19 14L19.8 17.2L23 18L19.8 18.8L19 22L18.2 18.8L15 18L18.2 17.2L19 14Z" stroke-width="1.5"/>
+      </svg>
+      <span>View in AR</span>
+    </button>
+
+    <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
+
+    <!-- IC placement -->
+    <button id="icBtn"
+      data-tip="Place a DIP IC — pick a part, click a valid start position, Esc to cancel"
+      aria-label="Place IC">
+      <!-- Chip icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="7" y="7" width="10" height="10" rx="1"/>
+        <path d="M7 9H5M7 12H4M7 15H5M17 9H19M17 12H20M17 15H19M9 7V5M12 7V4M15 7V5M9 17V19M12 17V20M15 17V19"/>
+      </svg>
+      <span>IC</span>
+    </button>
+
+    <!-- IC Part Selector -->
+    <select id="icPartSelect"
+      title="Select IC type"
+      aria-label="Select IC type">
       <option value="7400">7400 NAND</option>
       <option value="7402">7402 NOR</option>
       <option value="7404">7404 Inverter</option>
@@ -182,33 +470,108 @@
       <option value="74151">74151 MUX</option>
       <option value="7486">7486 XOR</option>
     </select>
-    <button id="wireBtn" title="Connect two holes with a jumper wire (pick a color, click start and end hole)">Wire</button>
-    <button id="ledBtn" title="Place a 5mm LED (pick a color, click anode then cathode hole)">LED</button>
-    <button id="powerBtn" title="Connect the 5V power supply (red + and black - wires) to breadboard holes">Power</button>
-    <button id="undoBtn" title="Undo the last placed component (or press Backspace)">Undo</button>
-    <button id="clearBtn" title="Remove all placed components">Clear</button>
+
+    <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
+
+    <!-- Wire -->
+    <button id="wireBtn"
+      data-tip="Connect two holes with a jumper wire — pick a color, click start and end hole"
+      aria-label="Place wire">
+      <!-- Wire icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M4 12h4a4 4 0 0 0 4-4V6m4 14h-4a4 4 0 0 0-4 4"/>
+        <circle cx="4" cy="12" r="2" fill="currentColor" stroke="none" opacity="0.6"/>
+        <circle cx="20" cy="12" r="2" fill="currentColor" stroke="none" opacity="0.6"/>
+        <line x1="8" y1="12" x2="16" y2="12"/>
+      </svg>
+      <span>Wire</span>
+    </button>
+
+    <!-- LED -->
+    <button id="ledBtn"
+      data-tip="Place a 5mm LED — pick a color, click anode then cathode hole"
+      aria-label="Place LED">
+      <!-- LED icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="10" r="4"/>
+        <line x1="12" y1="14" x2="12" y2="20"/>
+        <line x1="9" y1="20" x2="15" y2="20"/>
+        <line x1="16" y1="6" x2="18" y2="4"/>
+        <line x1="18" y1="8" x2="21" y2="7"/>
+      </svg>
+      <span>LED</span>
+    </button>
+
+    <!-- Power -->
+    <button id="powerBtn"
+      data-tip="Connect the 5V power supply (red + and black −) to breadboard holes"
+      aria-label="Place power supply">
+      <!-- Bolt icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" fill="currentColor" opacity="0.5" stroke="currentColor"/>
+      </svg>
+      <span>Power</span>
+    </button>
+
+    <div class="toolbar-sep" role="separator" aria-hidden="true"></div>
+
+    <!-- Undo -->
+    <button id="undoBtn"
+      data-tip="Undo the last placed component (or press Backspace)"
+      aria-label="Undo last action">
+      <!-- Undo icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 7v6h6"/>
+        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+      </svg>
+      <span>Undo</span>
+    </button>
+
+    <!-- Clear -->
+    <button id="clearBtn"
+      data-tip="Remove all placed components from the breadboard"
+      aria-label="Clear all components">
+      <!-- Trash icon -->
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <polyline points="3 6 5 6 21 6"/>
+        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+        <path d="M10 11v6M14 11v6"/>
+        <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+      </svg>
+      <span>Clear</span>
+    </button>
   </div>
-  <div id="wireToolbar">
-    <span class="wire-label">Wire</span>
-    <button class="swatch" data-color="red" data-hex="#e53935" style="--c:#e53935" title="red"></button>
-    <button class="swatch" data-color="blue" data-hex="#2962ff" style="--c:#2962ff" title="blue"></button>
-    <button class="swatch" data-color="green" data-hex="#2e7d32" style="--c:#2e7d32" title="green"></button>
-    <button class="swatch" data-color="yellow" data-hex="#f9a825" style="--c:#f9a825" title="yellow"></button>
-    <button class="swatch" data-color="black" data-hex="#1a1a1a" style="--c:#1a1a1a" title="black"></button>
-    <button class="swatch" data-color="white" data-hex="#f5f5f5" style="--c:#f5f5f5" title="white"></button>
-    <button class="swatch" data-color="orange" data-hex="#ef6c00" style="--c:#ef6c00" title="orange"></button>
-    <button class="swatch" data-color="purple" data-hex="#6a1b9a" style="--c:#6a1b9a" title="purple"></button>
-    <button class="swatch" data-color="brown" data-hex="#6d4c41" style="--c:#6d4c41" title="brown"></button>
+
+  <!-- Wire color sub-toolbar -->
+  <div id="wireToolbar" role="group" aria-label="Wire color picker">
+    <span class="wire-label">Wire Color</span>
+    <button class="swatch" data-color="red"    data-hex="#e53935" style="--c:#e53935" title="Red"    aria-label="Red wire"></button>
+    <button class="swatch" data-color="blue"   data-hex="#2962ff" style="--c:#2962ff" title="Blue"   aria-label="Blue wire"></button>
+    <button class="swatch" data-color="green"  data-hex="#2e7d32" style="--c:#2e7d32" title="Green"  aria-label="Green wire"></button>
+    <button class="swatch" data-color="yellow" data-hex="#f9a825" style="--c:#f9a825" title="Yellow" aria-label="Yellow wire"></button>
+    <button class="swatch" data-color="black"  data-hex="#1a1a1a" style="--c:#1a1a1a" title="Black"  aria-label="Black wire"></button>
+    <button class="swatch" data-color="white"  data-hex="#f5f5f5" style="--c:#f5f5f5" title="White"  aria-label="White wire"></button>
+    <button class="swatch" data-color="orange" data-hex="#ef6c00" style="--c:#ef6c00" title="Orange" aria-label="Orange wire"></button>
+    <button class="swatch" data-color="purple" data-hex="#6a1b9a" style="--c:#6a1b9a" title="Purple" aria-label="Purple wire"></button>
+    <button class="swatch" data-color="brown"  data-hex="#6d4c41" style="--c:#6d4c41" title="Brown"  aria-label="Brown wire"></button>
   </div>
-  <div id="ledToolbar">
-    <span class="led-label">LED</span>
-    <button class="swatch" data-color="red" data-hex="#ff3b30" style="--c:#ff3b30" title="red"></button>
-    <button class="swatch" data-color="yellow" data-hex="#ffd60a" style="--c:#ffd60a" title="yellow"></button>
-    <button class="swatch" data-color="green" data-hex="#34c759" style="--c:#34c759" title="green"></button>
-    <button class="swatch" data-color="blue" data-hex="#2979ff" style="--c:#2979ff" title="blue"></button>
-    <button class="swatch" data-color="white" data-hex="#ffffff" style="--c:#ffffff" title="white"></button>
+
+  <!-- LED color sub-toolbar -->
+  <div id="ledToolbar" role="group" aria-label="LED color picker">
+    <span class="led-label">LED Color</span>
+    <button class="swatch" data-color="red"    data-hex="#ff3b30" style="--c:#ff3b30" title="Red"    aria-label="Red LED"></button>
+    <button class="swatch" data-color="yellow" data-hex="#ffd60a" style="--c:#ffd60a" title="Yellow" aria-label="Yellow LED"></button>
+    <button class="swatch" data-color="green"  data-hex="#34c759" style="--c:#34c759" title="Green"  aria-label="Green LED"></button>
+    <button class="swatch" data-color="blue"   data-hex="#2979ff" style="--c:#2979ff" title="Blue"   aria-label="Blue LED"></button>
+    <button class="swatch" data-color="white"  data-hex="#ffffff" style="--c:#ffffff" title="White"  aria-label="White LED"></button>
   </div>
-  <div id="status" data-kind="info">Click the IC, Wire, LED or Power button to enable placement</div>
+
+  <!-- Status bar -->
+  <div id="status" data-kind="info" role="status" aria-live="polite">
+    Click the IC, Wire, LED or Power button to enable placement
+  </div>
+
+  <!-- Three.js import map -->
   <script type="importmap">
     {
       "imports": {
