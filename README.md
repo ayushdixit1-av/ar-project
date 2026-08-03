@@ -59,7 +59,7 @@ graph TD
 
 ---
 
-## ⚡ Getting Started (Ayush Lab)
+## ⚡ Getting Started (AR Lab)
 
 To run the Ayush AR Digital Electronics Lab locally:
 
