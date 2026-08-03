@@ -1,0 +1,10 @@
+{
+  "name": "Digital Logic Design Laboratory Trainer",
+  "description": "Interactive 3D Digital Electronics Laboratory Trainer for Logic Design Experiments, featuring realistic 74xx series ICs, X-Ray silicon die view, real-time Boolean logic simulation, multimeter probes, truth table auto-verification, and AI Professor diagnosis.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
