@@ -600,11 +600,34 @@
 
     .exp-actions {
       display: flex;
+      flex-wrap: wrap;
       gap: 10px;
     }
 
-    .exp-actions .start-btn {
+    .exp-actions .start-btn,
+    .exp-actions .watch-btn {
       flex: 1;
+    }
+
+    .ar-btn {
+      flex: 1;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      font-family: 'Caveat', 'Comic Sans MS', 'Segoe Script', cursive;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+      color: #fff;
+      box-shadow: 0 4px 14px rgba(139, 92, 246, 0.35);
+    }
+
+    .ar-btn:hover {
+      background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 6px 20px rgba(139, 92, 246, 0.45);
     }
 
     .watch-btn {
@@ -1185,6 +1208,7 @@
             </div>
             <div class="exp-actions">
               <button class="watch-btn" id="watchExp1Btn" title="Watch how to run this experiment before you start">Watch Video</button>
+              <button class="ar-btn" id="arExp1Btn" title="Place the 7408 AND circuit in your room in Augmented Reality (works on phones)">View in AR</button>
               <button class="start-btn" id="startExp1">Start Experiment</button>
             </div>
           </div>

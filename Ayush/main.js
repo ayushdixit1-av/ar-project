@@ -44,6 +44,7 @@ import { TruthTablePanel } from './TruthTablePanel.js';
 import { ExperimentGuide, ExperimentGuidePanel } from './ExperimentGuide.js';
 import { initShowcase } from './BreadboardShowcase.js';
 import { initEquipment } from './EquipmentShowcase.js';
+import { launchExperiment1AR } from './ARMode.js';
 
 export function buildSphereField(holes) {
   const group = new THREE.Group();
@@ -447,6 +448,9 @@ if (typeof document !== 'undefined') {
   setupVideoHero();
   initShowcase();
   initEquipment();
+
+  const arExp1Btn = document.getElementById('arExp1Btn');
+  if (arExp1Btn) arExp1Btn.addEventListener('click', launchExperiment1AR);
 
   if (landingPage && labContainer && startExp1 && backToDashBtn) {
     startExp1.addEventListener('click', () => {
