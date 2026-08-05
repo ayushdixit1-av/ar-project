@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+  />
+  <title>AR View - Experiment 1 | VETLab</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&display=swap');
+
+    * { box-sizing: border-box; }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: radial-gradient(1200px 800px at 50% -10%, #141b2b 0%, #0a0e16 60%, #06080d 100%);
+      color: #e6ecf7;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      overflow: hidden;
+    }
+
+    .wrap {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .logo {
+      font-family: 'Caveat', 'Comic Sans MS', 'Segoe Script', cursive;
+      font-size: 42px;
+      font-weight: 700;
+      letter-spacing: 1px;
+    }
+    .logo span {
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    h1 {
+      font-family: 'Caveat', 'Comic Sans MS', 'Segoe Script', cursive;
+      font-size: 40px;
+      font-weight: 700;
+      margin: 0;
+    }
+
+    .sub { color: #9fb0cf; margin: 0; font-size: 15px; }
+
+    #launchAR {
+      margin-top: 8px;
+      padding: 16px 44px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      font-family: 'Caveat', 'Comic Sans MS', 'Segoe Script', cursive;
+      font-size: 22px;
+      font-weight: 700;
+      color: #fff;
+      background: linear-gradient(135deg, #8b5cf6 0%, #6d28d9 100%);
+      box-shadow: 0 10px 30px rgba(139, 92, 246, 0.4);
+      transition: all 0.2s ease;
+    }
+    #launchAR:hover {
+      background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%);
+      transform: translateY(-2px);
+    }
+
+    .steps {
+      list-style: none;
+      padding: 0;
+      margin: 6px 0 0;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      font-size: 13px;
+      color: #9fb0cf;
+    }
+    .steps b { color: #dbe6ff; }
+
+    .steps .tag {
+      display: inline-block;
+      margin-right: 6px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .steps .tag.android { background: rgba(61, 220, 132, 0.18); color: #4ade80; }
+    .steps .tag.iphone { background: rgba(59, 130, 246, 0.18); color: #60a5fa; }
+    .steps .tag.desktop { background: rgba(148, 163, 184, 0.16); color: #94a3b8; }
+
+    .back {
+      margin-top: 14px;
+      color: #64748b;
+      text-decoration: none;
+      font-size: 13px;
+      border-bottom: 1px solid transparent;
+    }
+    .back:hover { color: #a5b4fc; border-bottom-color: currentColor; }
+
+    .chip {
+      font-size: 12px;
+      color: #64748b;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 999px;
+      padding: 5px 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="logo">VET<span>Lab</span></div>
+    <div class="chip">Experiment 1 · 7408 AND gate</div>
+    <h1>Augmented Reality View</h1>
+    <p class="sub">
+      Drop the virtual breadboard into your real room. The circuit auto-cycles
+      the AND truth table so you can watch the output LED respond.
+    </p>
+
+    <button id="launchAR" type="button">Launch AR</button>
+
+    <ul class="steps">
+      <li>
+        <span class="tag android">Android</span>
+        <b>Chrome + ARCore</b> - tap Launch AR, aim at a flat surface, then tap the
+        floor/table to place the board.
+      </li>
+      <li>
+        <span class="tag iphone">iPhone</span>
+        <b>Safari</b> - gyro view. Move the phone to look around the circuit.
+      </li>
+      <li>
+        <span class="tag desktop">Desktop</span>
+        <b>Mouse</b> - drag to rotate around the circuit.
+      </li>
+    </ul>
+
+    <a class="back" href="./index.html">&larr; Back to the full lab</a>
+  </div>
+
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.180.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.180.0/examples/jsm/"
+      }
+    }
+  </script>
+  <script type="module">
+    import { launchExperiment1AR } from './ARMode.js';
+
+    const btn = document.getElementById('launchAR');
+    btn.addEventListener('click', () => {
+      btn.textContent = 'Starting...';
+      launchExperiment1AR();
+    });
+  </script>
+</body>
+</html>
