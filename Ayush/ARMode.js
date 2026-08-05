@@ -19,7 +19,7 @@
  * never touches the main lab renderer or scene.
  */
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { XREstimatedLight } from 'three/addons/webxr/XREstimatedLight.js';
 
 import { BreadboardBody } from './BreadboardBody.js';
 import { BreadboardConfig } from './BreadboardConfig.js';
@@ -118,20 +118,18 @@ function makePin(v, color, height = 3.2, radius = 0.45) {
   return mesh;
 }
 
-function buildMergedHoles(holes) {
-  const unit = new THREE.SphereGeometry(BreadboardConfig.hole.sphereRadius, 6, 5);
-  const geoms = [];
-  for (const h of holes) {
-    const g = unit.clone();
-    g.translate(h.position.x, 0, h.position.y);
-    geoms.push(g);
+/** All 882 holes as a single instanced draw call (mobile-friendly). */
+function buildHoleField(holes) {
+  const geo = new THREE.SphereGeometry(BreadboardConfig.hole.sphereRadius, 6, 5);
+  const mat = new THREE.MeshStandardMaterial({ color: 0x9aa3af, roughness: 0.65, metalness: 0.15 });
+  const mesh = new THREE.InstancedMesh(geo, mat, holes.length);
+  const m = new THREE.Matrix4();
+  for (let i = 0; i < holes.length; i++) {
+    m.makeTranslation(holes[i].position.x, 0, holes[i].position.y);
+    mesh.setMatrixAt(i, m);
   }
-  const merged = mergeGeometries(geoms);
-  unit.dispose();
-  return new THREE.Mesh(
-    merged,
-    new THREE.MeshStandardMaterial({ color: 0x9aa3af, roughness: 0.65, metalness: 0.15 })
-  );
+  mesh.instanceMatrix.needsUpdate = true;
+  return mesh;
 }
 
 /**
@@ -148,7 +146,7 @@ export function buildExperiment1Group() {
   const pos = new Map(holes.map((h) => [h.id, new THREE.Vector3(h.position.x, 0, h.position.y)]));
 
   group.add(BreadboardBody.build());
-  group.add(buildMergedHoles(holes));
+  group.add(buildHoleField(holes));
 
   // 7408 AND gate straddling the center gap, pin 1 at E24.
   const pins = IC.footprintFor('7408', 'E', 24, 'NORMAL');
@@ -193,7 +191,7 @@ export function buildExperiment1Group() {
   LEDRenderer.setGlow(led, false, 'red');
 
   const status = makeSprite('', {
-    lines: ['Experiment 1 · 7408 AND', 'A=0  B=0  ->  OUT=0'],
+    lines: ['Experiment 1 · 7408 AND', 'A=0  B=0  \u2192  OUT=0'],
     height: 16,
     fontSize: 30,
   });
@@ -219,7 +217,7 @@ export function buildExperiment1Group() {
       pin.material.emissive.set(color);
     }
     status.material.map = makeCanvasTexture('', {
-      lines: ['Experiment 1 · 7408 AND', `A=${a}  B=${b}  ->  OUT=${out}`],
+      lines: ['Experiment 1 · 7408 AND', `A=${a}  B=${b}  \u2192  OUT=${out}`],
       height: 16,
       fontSize: 30,
     });
@@ -322,14 +320,14 @@ function close() {
 function makeReticle() {
   const g = new THREE.Group();
   const ring = new THREE.Mesh(
-    new THREE.RingGeometry(0.05, 0.09, 32),
+    new THREE.RingGeometry(0.06, 0.11, 32),
     new THREE.MeshBasicMaterial({ color: 0x4dabff, transparent: true, opacity: 0.9, side: THREE.DoubleSide })
   );
   ring.rotation.x = -Math.PI / 2;
   g.add(ring);
   const disc = new THREE.Mesh(
-    new THREE.CircleGeometry(0.05, 24),
-    new THREE.MeshBasicMaterial({ color: 0x4dabff, transparent: true, opacity: 0.25 })
+    new THREE.CircleGeometry(0.06, 24),
+    new THREE.MeshBasicMaterial({ color: 0x4dabff, transparent: true, opacity: 0.22 })
   );
   disc.rotation.x = -Math.PI / 2;
   g.add(disc);
@@ -345,55 +343,108 @@ async function startXR({ overlay, stage, model, hint }) {
 
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 50);
-  scene.add(new THREE.AmbientLight(0xffffff, 2));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.5);
-  dir.position.set(1, 2, 1);
-  scene.add(dir);
+
+  // Soft base light plus real AR light estimation when the session provides it.
+  const ambient = new THREE.AmbientLight(0xffffff, 1.1);
+  scene.add(ambient);
+  const xrLight = new XREstimatedLight(renderer);
+  scene.add(xrLight);
+  const onEstimation = () => {
+    if (xrLight.environment) scene.environment = xrLight.environment;
+    if (xrLight.directionalLight) scene.add(xrLight.directionalLight);
+    ambient.intensity = 0.4;
+  };
+  xrLight.addEventListener('estimationstart', onEstimation);
+  let xrDisposed = false;
 
   let scaleVal = MODELS.xrScale;
   let surfaceY = 0;
-  model.scale.setScalar(scaleVal);
-  scene.add(model);
-
-  const reticle = makeReticle();
-  scene.add(reticle);
-
-  let session = null;
-  let hitSource = null;
   let placed = false;
   let stopped = false;
+  let session = null;
+  let hitSource = null;
   const timer = setInterval(() => {
     if (!stopped) model.userData.advance();
   }, MODELS.cycleMs);
 
-  const sessionInit = {
-    optionalFeatures: ['hit-test', 'local-floor', 'dom-overlay'],
-    domOverlay: { root: overlay },
-  };
+  const reticle = makeReticle();
+  reticle.visible = false;
+  scene.add(reticle);
+
+  model.scale.setScalar(scaleVal);
+  model.visible = false; // hidden until the user places it on a surface
+  scene.add(model);
 
   const lift = () => (9 / 1000) * scaleVal;
 
-  function placeAt(reticleMatrix) {
-    const cam = renderer.xr.getCamera(camera);
-    model.position.setFromMatrixPosition(reticleMatrix);
+  function placeOnSurface(matrix) {
+    const cam = renderer.xr.getCamera();
+    model.position.setFromMatrixPosition(matrix);
     surfaceY = model.position.y;
     model.position.y = surfaceY + lift();
-    const yaw = Math.atan2(cam.position.x - model.position.x, cam.position.z - model.position.z);
-    model.rotation.set(0, yaw, 0);
+    model.rotation.set(0, Math.atan2(cam.position.x - model.position.x, cam.position.z - model.position.z), 0);
+    model.visible = true;
     placed = true;
     reticle.visible = false;
     hint.textContent = 'Tap anywhere to move the board.';
   }
 
-  function onSelect() {
-    if (reticle.visible) placeAt(reticle.matrix);
+  function placeInFront() {
+    const cam = renderer.xr.getCamera();
+    const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
+    model.position.copy(cam.position).addScaledVector(forward, 0.8);
+    model.position.y = Math.max(model.position.y - 0.15, 0.02) + lift();
+    surfaceY = model.position.y - lift();
+    model.rotation.set(0, Math.atan2(forward.x, forward.z), 0);
+    model.visible = true;
+    placed = true;
+    reticle.visible = false;
+    hint.textContent = 'Tap anywhere to move the board.';
+  }
+
+  function tryPlace() {
+    if (reticle.visible) placeOnSurface(reticle.matrix);
+    else if (placed) placeInFront();
+  }
+  const onOverlayTap = (e) => {
+    if (e.target.closest('button')) return;
+    tryPlace();
+  };
+
+  const sessionInit = {
+    optionalFeatures: ['hit-test', 'local-floor', 'dom-overlay', 'light-estimation'],
+    domOverlay: { root: overlay },
+  };
+
+  let autoTimer = null;
+
+  function onSessionEnd() {
+    clearTimeout(autoTimer);
+    clearInterval(timer);
+    session.removeEventListener('select', tryPlace);
+    overlay.removeEventListener('click', onOverlayTap);
+    cleanupRenderer(renderer);
+    if (!xrDisposed) {
+      xrDisposed = true;
+      xrLight.dispose();
+    }
+    if (stopped) return;
+    stopped = true;
+    close();
   }
 
   try {
     session = await navigator.xr.requestSession('immersive-ar', sessionInit);
     await renderer.xr.setSession(session);
-    session.addEventListener('select', onSelect);
+
+    // dom-overlay shows our DOM over the passthrough camera, so the dark
+    // page background must not block the real world.
+    overlay.style.background = 'transparent';
     stage.style.display = 'none';
+    hint.textContent = 'Aim your phone at a flat surface, then tap to place the board.';
+
+    session.addEventListener('select', tryPlace);
+    overlay.addEventListener('click', onOverlayTap);
 
     const viewer = await session.requestReferenceSpace('viewer');
     try {
@@ -402,30 +453,27 @@ async function startXR({ overlay, stage, model, hint }) {
       hitSource = null;
     }
 
-    const autoTimer = setTimeout(() => {
+    if (!hitSource) {
+      hint.textContent = 'No surface detection - the board appears in front of you. Tap to move it.';
+    }
+
+    autoTimer = setTimeout(() => {
       if (stopped || placed) return;
-      const cam = renderer.xr.getCamera(camera);
-      const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(cam.quaternion);
-      model.position.copy(cam.position).addScaledVector(forward, 0.8);
-      model.position.y = Math.max(model.position.y - 0.15, 0.02) + lift();
-      surfaceY = model.position.y - lift();
-      model.rotation.set(0, Math.atan2(forward.x, forward.z), 0);
-      placed = true;
+      placeInFront();
       hint.textContent = 'Tap anywhere to move the board.';
     }, 3500);
 
-    session.addEventListener('end', () => {
-      clearTimeout(autoTimer);
-      clearInterval(timer);
-      if (stopped) return;
-      stopped = true;
-      cleanupRenderer(renderer);
-      close();
-    });
+    session.addEventListener('end', onSessionEnd);
   } catch (err) {
+    clearInterval(timer);
     hint.textContent = 'AR not available on this device - switching to gyro view.';
+    overlay.style.background = '';
     stage.style.display = 'block';
     cleanupRenderer(renderer);
+    if (!xrDisposed) {
+      xrDisposed = true;
+      xrLight.dispose();
+    }
     return startGyro({ overlay, stage, model, hint });
   }
 
@@ -435,6 +483,10 @@ async function startXR({ overlay, stage, model, hint }) {
     clearInterval(timer);
     if (session && session.end) session.end().catch(() => {});
     cleanupRenderer(renderer);
+    if (!xrDisposed) {
+      xrDisposed = true;
+      xrLight.dispose();
+    }
   };
 
   renderer.setAnimationLoop((time, frame) => {
@@ -495,18 +547,21 @@ function startGyro({ overlay, stage, model, hint }) {
   scene.background = new THREE.Color(0x0a0d14);
   scene.add(new THREE.GridHelper(1200, 24, 0x2c3a52, 0x1a2332));
   scene.add(new THREE.AmbientLight(0xffffff, 1.5));
-  const dir = new THREE.DirectionalLight(0xffffff, 1.3);
+  const dir = new THREE.DirectionalLight(0xffffff, 1.2);
   dir.position.set(200, 400, 300);
   scene.add(dir);
+  scene.add(new THREE.HemisphereLight(0xbfd0ff, 0x20242c, 0.6));
 
   let scaleVal = MODELS.gyroScale;
   model.scale.setScalar(scaleVal);
-  model.position.set(0, 12, 0);
+  model.visible = true;
+  model.position.set(0, 9 * scaleVal, 0); // board bottom sits exactly on the grid
   scene.add(model);
 
   const camera = new THREE.PerspectiveCamera(70, w / h, 1, 6000);
   let yaw = Math.PI / 6;
   let pitch = 0.12;
+  let gyroActive = false;
   let baseAlpha = null;
   let baseBeta = null;
 
@@ -528,12 +583,9 @@ function startGyro({ overlay, stage, model, hint }) {
       baseBeta = e.beta;
       return;
     }
+    gyroActive = true;
     yaw = Math.PI / 6 - THREE.MathUtils.degToRad(e.alpha - baseAlpha);
-    pitch = THREE.MathUtils.clamp(
-      0.12 + THREE.MathUtils.degToRad(e.beta - baseBeta),
-      -1.2,
-      1.2
-    );
+    pitch = THREE.MathUtils.clamp(0.12 + THREE.MathUtils.degToRad(e.beta - baseBeta), -1.2, 1.2);
     updateCamera();
   }
   window.addEventListener('deviceorientation', onOrientation);
@@ -585,7 +637,13 @@ function startGyro({ overlay, stage, model, hint }) {
     cleanupRenderer(renderer);
   };
 
-  renderer.setAnimationLoop(() => renderer.render(scene, camera));
+  renderer.setAnimationLoop(() => {
+    if (!dragging && !gyroActive) {
+      yaw += 0.0018; // gentle auto-rotate while the user is not interacting
+      updateCamera();
+    }
+    renderer.render(scene, camera);
+  });
 
   return {
     mode: 'gyro',
@@ -594,7 +652,7 @@ function startGyro({ overlay, stage, model, hint }) {
       if (next === scaleVal) return;
       scaleVal = next;
       model.scale.setScalar(scaleVal);
-      model.position.y = 12 * scaleVal;
+      model.position.y = 9 * scaleVal;
       updateCamera();
     },
     stop,
@@ -608,7 +666,11 @@ function startGyro({ overlay, stage, model, hint }) {
 async function isXRSupported() {
   if (typeof navigator === 'undefined' || !('xr' in navigator)) return false;
   try {
-    return await navigator.xr.isSessionSupported('immersive-ar');
+    const result = await Promise.race([
+      navigator.xr.isSessionSupported('immersive-ar'),
+      new Promise((resolve) => setTimeout(() => resolve(false), 2500)),
+    ]);
+    return result === true;
   } catch (err) {
     return false;
   }
@@ -627,11 +689,13 @@ export async function launchExperiment1AR() {
   overlay.querySelector('#vetArMinus').addEventListener('click', () => ctx && ctx.resize(-0.5));
   overlay.querySelector('#vetArPlus').addEventListener('click', () => ctx && ctx.resize(0.5));
 
+  // iOS must see the permission prompt inside the user gesture, before awaits.
+  await requestGyroPermission();
+
   if (await isXRSupported()) {
-    hint.textContent = 'Aim your phone at a flat surface, then tap to place the board.';
+    hint.textContent = 'Starting AR...';
     ctx = await startXR({ overlay, stage, model, hint });
   } else {
-    await requestGyroPermission();
     hint.textContent = 'Move your phone to look around - or drag to rotate';
     ctx = startGyro({ overlay, stage, model, hint });
   }
