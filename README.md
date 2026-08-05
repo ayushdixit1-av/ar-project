@@ -49,7 +49,7 @@ graph TD
 | Folder | Module / Feature Description |
 | :--- | :--- |
 | **`Ayush/`** | 3D Interactive Breadboard Simulator with WebXR AR support (`✨ View in AR`), IC placement, wire routing, LED components, and power supply management. |
-| **`Amey/`** | Contributor module. |
+| **`Amey/`** | Active Contributor |
 | **`Aadvik/`** | Experimental AR modules & lab resources. |
 | **`Amar/`** | Contributor module. |
 | **`Devanshi/`** | Contributor module. |
@@ -61,7 +61,7 @@ graph TD
 
 ## ⚡ Getting Started (AR Lab)
 
-To run the Ayush AR Digital Electronics Lab locally:
+To run the AR Digital Electronics Lab (IIT-K) locally:
 
 ```bash
 cd Ayush
