@@ -219,7 +219,7 @@ export class ICPlacementTool {
 
     const body = new THREE.Mesh(
       new THREE.BoxGeometry(bounds.width + 0.75, 2.4, bounds.height + 0.75),
-      new THREE.MeshStandardMaterial({ color: 0x2266ff, roughness: 0.6 })
+      new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.5 })
     );
     body.position.set(bounds.centerX, 1.2, bounds.centerY);
     group.add(body);

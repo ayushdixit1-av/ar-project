@@ -10,7 +10,6 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { ARButton } from 'three/addons/webxr/ARButton.js';
 
 import { BreadboardConfig } from './BreadboardConfig.js';
 import { BreadboardBody } from './BreadboardBody.js';
@@ -32,6 +31,19 @@ import { LEDPlacementTool } from './LEDPlacementTool.js';
 import { PowerSupplyManager } from './PowerSupplyManager.js';
 import { PowerSupplyRenderer } from './PowerSupplyRenderer.js';
 import { PowerSupplyTool } from './PowerSupplyTool.js';
+import { SwitchManager } from './SwitchManager.js';
+import { SwitchRenderer } from './SwitchRenderer.js';
+import { SwitchPlacementTool } from './SwitchPlacementTool.js';
+import { ProbeManager } from './ProbeManager.js';
+import { ProbeRenderer } from './ProbeRenderer.js';
+import { ProbeTool } from './ProbeTool.js';
+import { ProbePanel } from './ProbePanel.js';
+import { GateCatalog } from './GateCatalog.js';
+import { Simulator } from './Simulator.js';
+import { TruthTablePanel } from './TruthTablePanel.js';
+import { ExperimentGuide, ExperimentGuidePanel } from './ExperimentGuide.js';
+import { initShowcase } from './BreadboardShowcase.js';
+import { initEquipment } from './EquipmentShowcase.js';
 
 export function buildSphereField(holes) {
   const group = new THREE.Group();
@@ -75,14 +87,25 @@ function attachViewer(group) {
     0.1,
     5000
   );
-  camera.position.set(0, 220, 320);
+  camera.position.set(0, 110, 195);
   camera.lookAt(0, 0, 0);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.setPixelRatio(window.devicePixelRatio);
-  renderer.xr.enabled = true;
-  document.body.appendChild(renderer.domElement);
+  
+  const canvasContainer = document.getElementById('canvasContainer');
+  if (canvasContainer) {
+    canvasContainer.appendChild(renderer.domElement);
+  } else {
+    document.body.appendChild(renderer.domElement);
+  }
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
 
   const controls = new OrbitControls(camera, renderer.domElement);
   controls.enableDamping = true;
@@ -90,18 +113,12 @@ function attachViewer(group) {
   controls.target.set(0, 0, 0);
   controls.update();
 
-  renderer.setAnimationLoop(() => {
-    if (!renderer.xr.isPresenting) {
-      controls.update();
-    }
+  function animate() {
+    requestAnimationFrame(animate);
+    controls.update();
     renderer.render(scene, camera);
-  });
-
-  window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-  });
+  }
+  animate();
 
   return { renderer, controls, scene, camera, group };
 }
@@ -237,8 +254,101 @@ function setupPowerTool(viewer, field, allHoles, statusEl) {
   return { manager, tool };
 }
 
-function setupLabels(scene) {
-  try {
+function setupSwitchTool(viewer, field, allHoles, statusEl) {
+  const { renderer, camera, scene } = viewer;
+  const swBtn = document.getElementById('swBtn');
+
+  const manager = new SwitchManager(new Set(allHoles.map((h) => h.id)));
+  const tool = new SwitchPlacementTool({
+    domElement: renderer.domElement,
+    camera,
+    scene,
+    field,
+    manager,
+    onStatus: (message, kind) => showStatus(statusEl, message, kind),
+    onModeChange: (active) => swBtn.classList.toggle('active', active),
+  });
+
+  return { manager, tool };
+}
+
+function setupProbeTool(viewer, field, allHoles, statusEl) {
+  const { renderer, camera, scene } = viewer;
+  const probeBtn = document.getElementById('probeBtn');
+
+  const manager = new ProbeManager(new Set(allHoles.map((h) => h.id)));
+  const tool = new ProbeTool({
+    domElement: renderer.domElement,
+    camera,
+    scene,
+    field,
+    manager,
+    onStatus: (message, kind) => showStatus(statusEl, message, kind),
+    onModeChange: (active) => probeBtn.classList.toggle('active', active),
+  });
+
+  return { manager, tool };
+}
+
+function setupVideoModal() {
+  const modal = document.getElementById('videoModal');
+  const closeBtn = document.getElementById('videoClose');
+  const watchBtn = document.getElementById('watchExp1Btn');
+  const video = document.getElementById('expVideo');
+  if (!modal || !closeBtn || !watchBtn || !video) return;
+
+  watchBtn.addEventListener('click', () => {
+    modal.classList.add('open');
+    const promise = video.play();
+    if (promise) promise.catch(() => {});
+  });
+
+  const close = () => {
+    video.pause();
+    modal.classList.remove('open');
+  };
+  closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', (event) => {
+    if (event.target === modal) close();
+  });
+
+  const speedButtons = modal.querySelectorAll('.video-controls button[data-speed]');
+  for (const btn of speedButtons) {
+    btn.addEventListener('click', () => {
+      video.playbackRate = Number(btn.dataset.speed);
+      for (const other of speedButtons) other.classList.toggle('active', other === btn);
+    });
+  }
+}
+
+function setupVideoHero() {
+  const hero = document.getElementById('videoHero');
+  const video = document.getElementById('heroVideo');
+  const cta = document.getElementById('heroStartBtn');
+  const expSection = document.getElementById('experiments');
+  if (!hero || !video) return;
+
+  const update = () => {
+    const h = hero.offsetHeight || window.innerHeight;
+    const y = Math.min(window.scrollY, h);
+    const prog = h > 0 ? y / h : 0;
+    video.style.transform =
+      `translate3d(0, ${-y}px, 0) scale(${(1 + prog * 0.15).toFixed(4)})`;
+    video.style.filter = `brightness(${(1 - prog * 0.22).toFixed(4)})`;
+  };
+
+  window.addEventListener('scroll', update, { passive: true });
+  window.addEventListener('resize', update);
+  update();
+
+  if (cta && expSection) {
+    cta.addEventListener('click', () => {
+      expSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
+}
+
+function setupLabels(scene) {  try {
     const group = LabelGenerator.build(scene);
     console.log(`[LABELS] Rendered ${group.children.length} label meshes.`);
     const statusEl = document.getElementById('status');
@@ -247,61 +357,6 @@ function setupLabels(scene) {
     console.error('[LABELS] Failed to render labels:', error);
     const statusEl = document.getElementById('status');
     if (statusEl) showStatus(statusEl, `[LABELS] Error: ${error.message}`, 'error');
-  }
-}
-
-function setupAR(viewer, boardContainer) {
-  const { renderer, scene } = viewer;
-  const arBtn = document.getElementById('arBtn');
-  const statusEl = document.getElementById('status');
-
-  if (!arBtn) return;
-
-  if (typeof navigator !== 'undefined' && 'xr' in navigator) {
-    navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
-      if (supported) {
-        const dummyARButton = ARButton.createButton(renderer, {
-          optionalFeatures: ['dom-overlay'],
-          domOverlay: { root: document.body }
-        });
-        dummyARButton.style.display = 'none';
-        document.body.appendChild(dummyARButton);
-
-        arBtn.addEventListener('click', () => {
-          dummyARButton.click();
-        });
-
-        renderer.xr.addEventListener('sessionstart', () => {
-          arBtn.classList.add('active');
-          arBtn.textContent = '✕ Exit AR';
-          scene.background = null;
-          boardContainer.scale.set(0.001, 0.001, 0.001);
-          boardContainer.position.set(0, -0.15, -0.4);
-          if (statusEl) showStatus(statusEl, 'AR Session Active - View breadboard in real space', 'success');
-        });
-
-        renderer.xr.addEventListener('sessionend', () => {
-          arBtn.classList.remove('active');
-          arBtn.innerHTML = '✨ View in AR';
-          scene.background = new THREE.Color(0x3a414c);
-          boardContainer.scale.set(1, 1, 1);
-          boardContainer.position.set(0, 0, 0);
-          if (statusEl) showStatus(statusEl, 'Exited AR session', 'info');
-        });
-      } else {
-        arBtn.addEventListener('click', () => {
-          if (statusEl) showStatus(statusEl, 'WebXR AR is not supported on this device/browser (Try Chrome on Android with ARCore).', 'error');
-        });
-      }
-    }).catch((err) => {
-      arBtn.addEventListener('click', () => {
-        if (statusEl) showStatus(statusEl, 'WebXR AR query error: ' + (err.message || err), 'error');
-      });
-    });
-  } else {
-    arBtn.addEventListener('click', () => {
-      if (statusEl) showStatus(statusEl, 'WebXR is not supported by your browser.', 'error');
-    });
   }
 }
 
@@ -343,42 +398,141 @@ printReport(
   'POWER SUPPLY SELF-REVIEW REPORT'
 );
 
+const switchChecks = [...SwitchManager.validate(), ...SwitchRenderer.validate()];
+printReport(
+  { pass: switchChecks.every((c) => c.ok), checks: switchChecks },
+  'SWITCH SELF-REVIEW REPORT'
+);
+
+const probeChecks = [...ProbeManager.validate(), ...ProbeRenderer.validate()];
+printReport(
+  { pass: probeChecks.every((c) => c.ok), checks: probeChecks },
+  'PROBE SELF-REVIEW REPORT'
+);
+
+const gateChecks = GateCatalog.validate();
+printReport(
+  { pass: gateChecks.every((c) => c.ok), checks: gateChecks },
+  'GATE CATALOG VERIFICATION REPORT'
+);
+
+const simChecks = Simulator.validate();
+printReport(
+  { pass: simChecks.every((c) => c.ok), checks: simChecks },
+  'SIMULATOR SELF-REVIEW REPORT'
+);
+
+const guideChecks = ExperimentGuide.validate();
+printReport(
+  { pass: guideChecks.every((c) => c.ok), checks: guideChecks },
+  'EXPERIMENT GUIDE VERIFICATION REPORT'
+);
+
 const allHoles = [...holes, ...power.holes];
 const field = buildSphereField(allHoles);
-
-const boardContainer = new THREE.Group();
-boardContainer.name = 'boardContainer';
-boardContainer.add(field);
-boardContainer.add(body);
-
 console.log(
   `[OUTPUT] ${holes.length} terminal + ${power.holes.length} power-rail holes; ` +
   `sphere field contains ${field.children.length} meshes.`
 );
 
-const viewer = attachViewer(boardContainer);
+const viewer = attachViewer(field);
+
+if (typeof document !== 'undefined') {
+  const landingPage = document.getElementById('landingPage');
+  const labContainer = document.getElementById('labContainer');
+  const startExp1 = document.getElementById('startExp1');
+  const backToDashBtn = document.getElementById('backToDashBtn');
+
+  setupVideoModal();
+  setupVideoHero();
+  initShowcase();
+  initEquipment();
+
+  if (landingPage && labContainer && startExp1 && backToDashBtn) {
+    startExp1.addEventListener('click', () => {
+      const modal = document.getElementById('videoModal');
+      const video = document.getElementById('expVideo');
+      if (modal && video) {
+        video.pause();
+        modal.classList.remove('open');
+      }
+      landingPage.style.display = 'none';
+      labContainer.style.display = 'block';
+      document.body.classList.add('in-lab');
+      
+      if (viewer && viewer.renderer && viewer.camera) {
+        viewer.camera.aspect = window.innerWidth / window.innerHeight;
+        viewer.camera.updateProjectionMatrix();
+        viewer.renderer.setSize(window.innerWidth, window.innerHeight);
+      }
+    });
+
+    backToDashBtn.addEventListener('click', () => {
+      labContainer.style.display = 'none';
+      landingPage.style.display = 'flex';
+      document.body.classList.remove('in-lab');
+    });
+  }
+}
 
 let icTool = null;
 let wireTool = null;
 let ledTool = null;
 let powerTool = null;
+let swTool = null;
+let probeTool = null;
 let lastActiveTool = null;
 if (viewer) {
   const statusEl = document.getElementById('status');
   icTool = setupICPlacement(viewer, holes, field);
-  setupLabels(boardContainer);
-  setupAR(viewer, boardContainer);
+  setupLabels(viewer.scene);
+  viewer.scene.add(body);
   const wireSetup = setupWireTool(viewer, field, allHoles, statusEl);
   wireTool = wireSetup.tool;
   const ledSetup = setupLEDTool(viewer, field, allHoles, statusEl);
   ledTool = ledSetup.tool;
   const powerSetup = setupPowerTool(viewer, field, allHoles, statusEl);
   powerTool = powerSetup.tool;
+  const switchSetup = setupSwitchTool(viewer, field, allHoles, statusEl);
+  swTool = switchSetup.tool;
+  const probeSetup = setupProbeTool(viewer, field, allHoles, statusEl);
+  probeTool = probeSetup.tool;
+
+  const simulator = new Simulator({
+    holes: allHoles,
+    icManager: icTool.manager,
+    wireManager: wireSetup.manager,
+    ledManager: ledSetup.manager,
+    powerManager: powerSetup.manager,
+    switchManager: switchSetup.manager,
+  });
+  const probePanel = new ProbePanel({
+    simulator,
+    probeManager: probeSetup.manager,
+  });
+  const ttPanel = new TruthTablePanel({
+    simulator,
+    onStatus: (message, kind) => showStatus(statusEl, message, kind),
+  });
+  const guidePanel = new ExperimentGuidePanel({
+    simulator,
+    onStatus: (message, kind) => showStatus(statusEl, message, kind),
+  });
+  ttPanel.refresh();
+  guidePanel.refresh();
+  setInterval(() => {
+    simulator.recompute();
+    ttPanel.refresh();
+    guidePanel.refresh();
+    probePanel.refresh();
+  }, 200);
 
   const icBtn = document.getElementById('icBtn');
   const wireBtn = document.getElementById('wireBtn');
   const ledBtn = document.getElementById('ledBtn');
   const powerBtn = document.getElementById('powerBtn');
+  const swBtn = document.getElementById('swBtn');
+  const probeBtn = document.getElementById('probeBtn');
 
   lastActiveTool = wireTool;
 
@@ -387,6 +541,8 @@ if (viewer) {
     if (wireTool.isActive()) return wireTool;
     if (ledTool.isActive()) return ledTool;
     if (powerTool.isActive()) return powerTool;
+    if (swTool.isActive()) return swTool;
+    if (probeTool.isActive()) return probeTool;
     return lastActiveTool || wireTool;
   }
 
@@ -394,6 +550,8 @@ if (viewer) {
     wireTool.deactivate();
     ledTool.deactivate();
     powerTool.deactivate();
+    swTool.deactivate();
+    probeTool.deactivate();
     lastActiveTool = icTool;
     icTool.toggle();
   });
@@ -401,6 +559,8 @@ if (viewer) {
     icTool.deactivate();
     ledTool.deactivate();
     powerTool.deactivate();
+    swTool.deactivate();
+    probeTool.deactivate();
     lastActiveTool = wireTool;
     wireTool.toggle();
   });
@@ -408,6 +568,8 @@ if (viewer) {
     icTool.deactivate();
     wireTool.deactivate();
     powerTool.deactivate();
+    swTool.deactivate();
+    probeTool.deactivate();
     lastActiveTool = ledTool;
     ledTool.toggle();
   });
@@ -415,12 +577,39 @@ if (viewer) {
     icTool.deactivate();
     wireTool.deactivate();
     ledTool.deactivate();
+    swTool.deactivate();
+    probeTool.deactivate();
     lastActiveTool = powerTool;
     powerTool.toggle();
+  });
+  swBtn.addEventListener('click', () => {
+    icTool.deactivate();
+    wireTool.deactivate();
+    ledTool.deactivate();
+    powerTool.deactivate();
+    probeTool.deactivate();
+    lastActiveTool = swTool;
+    swTool.toggle();
+  });
+  probeBtn.addEventListener('click', () => {
+    icTool.deactivate();
+    wireTool.deactivate();
+    ledTool.deactivate();
+    powerTool.deactivate();
+    swTool.deactivate();
+    lastActiveTool = probeTool;
+    probeTool.toggle();
+  });
+
+  // Passive switch toggle: with no placement tool active, clicking a switch
+  // body flips it open/closed (like a real lab switch).
+  viewer.renderer.domElement.addEventListener('click', (event) => {
+    if (activePlacementTool().isActive()) return;
+    swTool.toggleAt(event);
   });
 
   document.getElementById('undoBtn').addEventListener('click', () => activePlacementTool().undoLast());
   document.getElementById('clearBtn').addEventListener('click', () => activePlacementTool().resetAll());
 }
 
-export { holes, field, viewer, icTool, wireTool, ledTool, powerTool, body, boardContainer };
+export { holes, field, viewer, icTool, wireTool, ledTool, powerTool, swTool, probeTool, body };

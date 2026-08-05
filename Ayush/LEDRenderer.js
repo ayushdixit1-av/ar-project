@@ -231,6 +231,25 @@ export class LEDRenderer {
     return found;
   }
 
+  /**
+   * Turn a placed LED's glow die on/off for simulation. Each LED gets its own
+   * cloned glow material so LEDs of the same color can differ.
+   */
+  static setGlow(group, on, color = 'red') {
+    if (!group) return;
+    const glow = this._find(group, 'led_glow');
+    if (!glow) return;
+    let mat = group.userData._glowMat;
+    if (!mat) {
+      mat = this.glowMaterialFor(color).clone();
+      mat.color.set(this.colorHex(color));
+      mat.emissive.set(this.colorHex(color));
+      group.userData._glowMat = mat;
+      glow.material = mat;
+    }
+    mat.emissiveIntensity = on ? 2.2 : 0;
+  }
+
   /** Headless self-review of the LED geometry. */
   static validate() {
     const checks = [];
@@ -283,6 +302,12 @@ export class LEDRenderer {
       'Ghost LED is translucent imaginary',
       ghost.name === 'led_ghost' && ghostBody.material.transparent === true && ghostBody.material.opacity < 1
     );
+
+    this.setGlow(group, false, 'red');
+    const glowOff = this._find(group, 'led_glow');
+    add('setGlow can extinguish the die', glowOff.material.emissiveIntensity === 0);
+    this.setGlow(group, true, 'red');
+    add('setGlow can light the die', glowOff.material.emissiveIntensity > 0);
 
     return checks;
   }

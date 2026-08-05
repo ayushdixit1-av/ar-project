@@ -4,10 +4,11 @@
  */
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
-import { extname, join, normalize } from 'node:path';
+import { extname, join, normalize, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ROOT = process.cwd();
-const PORT = Number(process.env.PORT) || 8080;
+const ROOT = dirname(fileURLToPath(import.meta.url));
+const PORT = Number(process.env.PORT) || 3000;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -17,6 +18,7 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
+  '.mp4': 'video/mp4',
   '.glb': 'model/gltf-binary',
   '.gltf': 'model/gltf+json',
   '.woff': 'font/woff',
