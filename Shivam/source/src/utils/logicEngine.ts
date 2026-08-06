@@ -202,7 +202,9 @@ export function evaluateDigitalCircuit(
 
       let errStr: string | undefined = undefined;
       if (!isChipPowered) {
-        errStr = `IC ${meta.icSeries || meta.name} is UNPOWERED. Connect Pin 14 to +5V and Pin 7 to GND!`;
+        const vccNum = vccPin ? vccPin.id.replace('pin-', '') : '14';
+        const gndNum = gndPin ? gndPin.id.replace('pin-', '') : '7';
+        errStr = `IC ${meta.icSeries || meta.name} is UNPOWERED. Connect Pin ${vccNum} to +5V and Pin ${gndNum} to GND!`;
       }
 
       gateNumbers.forEach((gNum) => {
