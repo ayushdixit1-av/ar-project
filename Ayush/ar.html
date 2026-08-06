@@ -163,7 +163,11 @@
     const btn = document.getElementById('launchAR');
     btn.addEventListener('click', () => {
       btn.textContent = 'Starting...';
-      launchExperiment1AR();
+      launchExperiment1AR({
+        onClose() {
+          btn.textContent = 'Launch AR';
+        },
+      });
     });
   </script>
 </body>
