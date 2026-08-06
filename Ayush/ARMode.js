@@ -38,6 +38,23 @@ const MODELS = {
 
 let overlay = null;
 let ctx = null;
+let activeModel = null;
+
+function disposeScene(scene) {
+  scene.traverse((obj) => {
+    if (obj.isMesh || obj.isLine || obj.isPoints) {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        if (Array.isArray(obj.material)) {
+          obj.material.forEach((m) => m.dispose());
+        } else {
+          obj.material.dispose();
+        }
+      }
+    }
+  });
+}
+let onCloseCb = null;
 
 /* ------------------------------------------------------------------ *
  * 3D demo model (Experiment 1: 7408 AND gate circuit)
@@ -186,9 +203,18 @@ export function buildExperiment1Group() {
   const inputB = makePin(pos.get('E25'), 0x22cc55);
   group.add(inputA, inputB);
 
-  const led = LEDRenderer.build(pos.get('D26'), pos.get('D25'), 'red').group;
+  const led = LEDRenderer.build(pos.get('D26'), pos.get('TN26'), 'red').group;
   group.add(led);
   LEDRenderer.setGlow(led, false, 'red');
+  led.traverse((o) => {
+    if (o.material && o.name !== 'led_glow') o.material.userData.vetShared = true;
+  });
+
+  const ledGnd = pos.get('D27').clone();
+  ledGnd.y = 1.2;
+  const ledRail = pos.get('TN30').clone();
+  ledRail.y = 1.6;
+  group.add(makeWire(ledRail, ledGnd, 0x22262c, 0.5));
 
   const status = makeSprite('', {
     lines: ['Experiment 1 · 7408 AND', 'A=0  B=0  \u2192  OUT=0'],
@@ -216,11 +242,14 @@ export function buildExperiment1Group() {
       pin.material.color.set(color);
       pin.material.emissive.set(color);
     }
+    if (status.material.map) status.material.map.dispose();
+    const oldTex = status.material.map;
     status.material.map = makeCanvasTexture('', {
       lines: ['Experiment 1 · 7408 AND', `A=${a}  B=${b}  \u2192  OUT=${out}`],
       height: 16,
       fontSize: 30,
     });
+    if (oldTex) oldTex.dispose();
     resizeSprite(status, 16);
   }
 
@@ -302,14 +331,40 @@ function cleanupRenderer(renderer) {
   renderer.dispose();
 }
 
+function disposeObject(obj) {
+  if (!obj || obj.userData._vetDisposed) return;
+  obj.userData._vetDisposed = true;
+  obj.traverse((o) => {
+    if (o.isMesh && o.geometry) o.geometry.dispose();
+    if (!o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      if (m.userData && m.userData.vetShared) continue;
+      if (m.map) m.map.dispose();
+      m.dispose();
+    }
+  });
+}
+
 function close() {
   if (ctx) {
     ctx.stop();
     ctx = null;
   }
+  if (activeModel) {
+    activeModel = null;
+  }
   if (overlay) {
     overlay.remove();
     overlay = null;
+  }
+  if (typeof document !== 'undefined') {
+    document.dispatchEvent(new CustomEvent('vet-ar-closed'));
+  }
+  if (onCloseCb) {
+    const cb = onCloseCb;
+    onCloseCb = null;
+    cb();
   }
 }
 
@@ -369,9 +424,10 @@ async function startXR({ overlay, stage, model, hint }) {
 
   const reticle = makeReticle();
   reticle.visible = false;
+  reticle.hasPose = false;
   scene.add(reticle);
 
-  model.scale.setScalar(scaleVal);
+  model.scale.setScalar(scaleVal * 0.001);
   model.visible = false; // hidden until the user places it on a surface
   scene.add(model);
 
@@ -385,7 +441,6 @@ async function startXR({ overlay, stage, model, hint }) {
     model.rotation.set(0, Math.atan2(cam.position.x - model.position.x, cam.position.z - model.position.z), 0);
     model.visible = true;
     placed = true;
-    reticle.visible = false;
     hint.textContent = 'Tap anywhere to move the board.';
   }
 
@@ -398,13 +453,15 @@ async function startXR({ overlay, stage, model, hint }) {
     model.rotation.set(0, Math.atan2(forward.x, forward.z), 0);
     model.visible = true;
     placed = true;
-    reticle.visible = false;
     hint.textContent = 'Tap anywhere to move the board.';
   }
 
   function tryPlace() {
-    if (reticle.visible) placeOnSurface(reticle.matrix);
-    else if (placed) placeInFront();
+    if (reticle.hasPose) {
+      placeOnSurface(reticle.matrix);
+    } else {
+      placeInFront();
+    }
   }
   const onOverlayTap = (e) => {
     if (e.target.closest('button')) return;
@@ -424,6 +481,8 @@ async function startXR({ overlay, stage, model, hint }) {
     session.removeEventListener('select', tryPlace);
     overlay.removeEventListener('click', onOverlayTap);
     cleanupRenderer(renderer);
+    disposeObject(model);
+    disposeObject(reticle);
     if (!xrDisposed) {
       xrDisposed = true;
       xrLight.dispose();
@@ -470,6 +529,7 @@ async function startXR({ overlay, stage, model, hint }) {
     overlay.style.background = '';
     stage.style.display = 'block';
     cleanupRenderer(renderer);
+    disposeObject(reticle);
     if (!xrDisposed) {
       xrDisposed = true;
       xrLight.dispose();
@@ -482,6 +542,7 @@ async function startXR({ overlay, stage, model, hint }) {
     stopped = true;
     clearInterval(timer);
     if (session && session.end) session.end().catch(() => {});
+    disposeScene(scene);
     cleanupRenderer(renderer);
     if (!xrDisposed) {
       xrDisposed = true;
@@ -490,16 +551,21 @@ async function startXR({ overlay, stage, model, hint }) {
   };
 
   renderer.setAnimationLoop((time, frame) => {
-    if (frame && hitSource && !placed) {
+    if (frame && hitSource) {
       const results = frame.getHitTestResults(hitSource);
       if (results && results.length) {
         const pose = results[0].getPose(renderer.xr.getReferenceSpace());
         if (pose) {
-          reticle.visible = true;
           reticle.matrix.fromArray(pose.transform.matrix);
+          reticle.visible = !placed;
+          reticle.hasPose = true;
         } else {
           reticle.visible = false;
+          reticle.hasPose = false;
         }
+      } else {
+        reticle.visible = false;
+        reticle.hasPose = false;
       }
     }
     renderer.render(scene, camera);
@@ -511,7 +577,7 @@ async function startXR({ overlay, stage, model, hint }) {
       const next = THREE.MathUtils.clamp(scaleVal + delta, MODELS.minScale, MODELS.maxScale);
       if (next === scaleVal) return;
       scaleVal = next;
-      model.scale.setScalar(scaleVal);
+      model.scale.setScalar(scaleVal * 0.001);
       if (placed) model.position.y = surfaceY + lift();
     },
     stop,
@@ -634,6 +700,7 @@ function startGyro({ overlay, stage, model, hint }) {
     window.removeEventListener('pointerup', onUp);
     window.removeEventListener('pointercancel', onUp);
     renderer.domElement.removeEventListener('pointerdown', onDown);
+    disposeScene(scene);
     cleanupRenderer(renderer);
   };
 
@@ -663,17 +730,11 @@ function startGyro({ overlay, stage, model, hint }) {
  * Public entry point
  * ------------------------------------------------------------------ */
 
-async function isXRSupported() {
-  if (typeof navigator === 'undefined' || !('xr' in navigator)) return false;
-  try {
-    const result = await Promise.race([
-      navigator.xr.isSessionSupported('immersive-ar'),
-      new Promise((resolve) => setTimeout(() => resolve(false), 2500)),
-    ]);
-    return result === true;
-  } catch (err) {
-    return false;
-  }
+let xrSupported = false;
+if (typeof navigator !== 'undefined' && 'xr' in navigator) {
+  navigator.xr.isSessionSupported('immersive-ar').then((supported) => {
+    xrSupported = supported;
+  }).catch(() => {});
 }
 
 export async function launchExperiment1AR() {
@@ -683,20 +744,18 @@ export async function launchExperiment1AR() {
   overlay = buildOverlay();
   const stage = overlay.querySelector('#vetArStage');
   const hint = overlay.querySelector('#vetArHint');
-  const model = buildExperiment1Group();
+  activeModel = buildExperiment1Group();
 
   overlay.querySelector('#vetArClose').addEventListener('click', close);
   overlay.querySelector('#vetArMinus').addEventListener('click', () => ctx && ctx.resize(-0.5));
   overlay.querySelector('#vetArPlus').addEventListener('click', () => ctx && ctx.resize(0.5));
 
-  // iOS must see the permission prompt inside the user gesture, before awaits.
-  await requestGyroPermission();
-
-  if (await isXRSupported()) {
+  if (xrSupported) {
     hint.textContent = 'Starting AR...';
-    ctx = await startXR({ overlay, stage, model, hint });
+    ctx = await startXR({ overlay, stage, model: activeModel, hint });
   } else {
     hint.textContent = 'Move your phone to look around - or drag to rotate';
-    ctx = startGyro({ overlay, stage, model, hint });
+    await requestGyroPermission();
+    ctx = startGyro({ overlay, stage, model: activeModel, hint });
   }
 }

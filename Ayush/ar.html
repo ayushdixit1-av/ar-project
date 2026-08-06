@@ -163,11 +163,13 @@
     const btn = document.getElementById('launchAR');
     btn.addEventListener('click', () => {
       btn.textContent = 'Starting...';
-      launchExperiment1AR({
-        onClose() {
-          btn.textContent = 'Launch AR';
-        },
-      });
+      btn.disabled = true;
+      launchExperiment1AR();
+    });
+
+    document.addEventListener('vet-ar-closed', () => {
+      btn.textContent = 'Launch AR';
+      btn.disabled = false;
     });
   </script>
 </body>
