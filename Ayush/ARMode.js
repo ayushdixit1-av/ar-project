@@ -242,7 +242,6 @@ export function buildExperiment1Group() {
       pin.material.color.set(color);
       pin.material.emissive.set(color);
     }
-    if (status.material.map) status.material.map.dispose();
     const oldTex = status.material.map;
     status.material.map = makeCanvasTexture('', {
       lines: ['Experiment 1 · 7408 AND', `A=${a}  B=${b}  \u2192  OUT=${out}`],
@@ -352,6 +351,7 @@ function close() {
     ctx = null;
   }
   if (activeModel) {
+    disposeObject(activeModel);
     activeModel = null;
   }
   if (overlay) {
