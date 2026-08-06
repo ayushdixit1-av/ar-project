@@ -2,13 +2,13 @@
  * serve.js - zero-dependency static server for the hole engine viewer.
  * Run: node serve.js   (defaults to http://localhost:8080)
  */
-import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { extname, join, normalize, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { createServer } from 'http';
+import { readFile } from 'fs/promises';
+import { extname, join, normalize, dirname } from 'path';
+import { fileURLToPath } from 'url';
 
 const ROOT = dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 8080;
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',

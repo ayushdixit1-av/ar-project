@@ -79,8 +79,9 @@ function attachViewer(group) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x3a414c);
   scene.add(group);
-  scene.add(new THREE.AmbientLight(0xffffff, 1.6));
-  scene.add(new THREE.DirectionalLight(0xffffff, 1.2, { position: (0, 1, 1) }));
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  dirLight.position.set(0, 100, 100);
+  scene.add(dirLight);
 
   const camera = new THREE.PerspectiveCamera(
     45,
@@ -613,7 +614,14 @@ if (viewer) {
   });
 
   document.getElementById('undoBtn').addEventListener('click', () => activePlacementTool().undoLast());
-  document.getElementById('clearBtn').addEventListener('click', () => activePlacementTool().resetAll());
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    icTool.resetAll();
+    wireTool.resetAll();
+    ledTool.resetAll();
+    powerTool.resetAll();
+    swTool.resetAll();
+    probeTool.resetAll();
+  });
 }
 
 export { holes, field, viewer, icTool, wireTool, ledTool, powerTool, swTool, probeTool, body };
