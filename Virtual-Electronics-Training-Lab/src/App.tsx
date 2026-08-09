@@ -7,7 +7,7 @@ import { DiagnosticsPanel } from './ui/DiagnosticsPanel';
 import { AROverlayModal } from './ui/AROverlayModal';
 import { LaboratorySceneManager } from './components3d/LaboratorySceneManager';
 import { CircuitSimulator, SimulationResult } from './electronics/circuitSimulator';
-import { createPresetCircuit } from './electronics/experiments';
+import { createPresetCircuit, createSOPPOSPresetCircuit, createAdderPresetCircuit, createExtraPresetsCircuit } from './electronics/experiments';
 import { CircuitState, ICType, MultimeterProbe, WireColor } from './types/electronics';
 import { soundFx } from './electronics/soundEffects';
 import { arManager } from './ar/ARManager';
@@ -17,6 +17,7 @@ export default function App() {
   // 1. Initial State: Load preset 7408 AND Gate experiment circuit
   const [circuitState, setCircuitState] = useState<CircuitState>(() => createPresetCircuit('7408'));
   const [activeICType, setActiveICType] = useState<ICType>('7408');
+  const [activeExperiment, setActiveExperiment] = useState<'GATES' | 'SOP_POS' | 'ADDERS'>('GATES');
 
   const [selectedWireColor, setSelectedWireColor] = useState<WireColor>('yellow');
   const [multimeterMode, setMultimeterMode] = useState<'VOLTAGE' | 'CONTINUITY' | 'LOGIC'>('VOLTAGE');
@@ -191,15 +192,23 @@ export default function App() {
   };
 
   const handleResetCircuit = () => {
-    setCircuitState({
-      powerSupplyOn: true,
-      powerSupplyVoltage: 5.0,
-      ics: [],
-      wires: [],
-      switches: [],
-      leds: [],
-      resistors: [],
-    });
+    if (activeExperiment === 'SOP_POS') {
+      setCircuitState(createSOPPOSPresetCircuit());
+    } else if (activeExperiment === 'ADDERS') {
+      setCircuitState(createAdderPresetCircuit(activeICType === 'FULL_ADDER' ? 'FULL_ADDER' : 'HALF_ADDER'));
+    } else if (['BIN_TO_GRAY', 'DECODER_2X4', 'MUX_4X1', 'COMPARATOR_1BIT', 'FF_SR', 'COUNTER_ASYNC', 'REG_PIPO'].includes(activeExperiment)) {
+      setCircuitState(createExtraPresetsCircuit(activeICType));
+    } else {
+      setCircuitState({
+        powerSupplyOn: true,
+        powerSupplyVoltage: 5.0,
+        ics: [],
+        wires: [],
+        switches: [],
+        leds: [],
+        resistors: [],
+      });
+    }
   };
 
   const handleSaveCircuit = () => {
@@ -226,7 +235,32 @@ export default function App() {
 
   const handleLoadPreset = (icType: ICType) => {
     setActiveICType(icType);
-    setCircuitState(createPresetCircuit(icType));
+    if (icType === 'SOP' || icType === 'POS') {
+      setCircuitState(createSOPPOSPresetCircuit());
+    } else if (icType === 'HALF_ADDER' || icType === 'FULL_ADDER') {
+      setCircuitState(createAdderPresetCircuit(icType));
+    } else if (['BIN_TO_GRAY', 'GRAY_TO_BIN', 'DECODER_2X4', 'MUX_4X1', 'COMPARATOR_1BIT', 'FF_SR', 'FF_D', 'COUNTER_ASYNC', 'REG_PIPO'].includes(icType)) {
+      setCircuitState(createExtraPresetsCircuit(icType));
+    } else {
+      setCircuitState(createPresetCircuit(icType));
+    }
+  };
+
+  const handleSelectExperiment = (exp: string) => {
+    setActiveExperiment(exp as any);
+    if (exp === 'GATES') {
+      setActiveICType('7408');
+      setCircuitState(createPresetCircuit('7408'));
+    } else if (exp === 'SOP_POS') {
+      setActiveICType('SOP');
+      setCircuitState(createSOPPOSPresetCircuit());
+    } else if (exp === 'ADDERS') {
+      setActiveICType('HALF_ADDER');
+      setCircuitState(createAdderPresetCircuit('HALF_ADDER'));
+    } else {
+      setActiveICType(exp as ICType);
+      setCircuitState(createExtraPresetsCircuit(exp as ICType));
+    }
   };
 
   const handleAddIC = (type: ICType) => {
@@ -307,6 +341,8 @@ export default function App() {
       <Navbar
         powerOn={circuitState.powerSupplyOn}
         voltage={circuitState.powerSupplyVoltage !== undefined ? circuitState.powerSupplyVoltage : 5.0}
+        activeExperiment={activeExperiment}
+        onSelectExperiment={handleSelectExperiment}
         onTogglePower={handleTogglePower}
         onChangeVoltage={(v) => setCircuitState(prev => ({ ...prev, powerSupplyVoltage: v }))}
         onResetCircuit={handleResetCircuit}
@@ -417,12 +453,14 @@ export default function App() {
       {/* Footer matching Immersive UI theme */}
       <footer className="h-8 bg-[#0F1115] border-t border-white/5 px-4 flex items-center justify-between shrink-0 text-[10px] font-mono text-slate-500 z-10">
         <div className="flex gap-4">
-          <span>IC: SN74HC{activeICType}N</span>
+          <span>IC: {activeICType.includes('_') || ['SOP','POS'].includes(activeICType) ? activeICType : `SN74HC${activeICType}N`}</span>
           <span>PINS: 14/14</span>
           <span>NODE: 0x2A4F</span>
         </div>
         <div className="hidden sm:block uppercase">
-          COMPONENT: IC {activeICType} • PIN 14 (VCC) - 5.04V
+          {activeICType.includes('_') || ['SOP','POS'].includes(activeICType) 
+            ? `EXP: ${activeICType}` 
+            : `COMPONENT: IC ${activeICType} • PIN 14 (VCC) - 5.04V`}
         </div>
       </footer>
 

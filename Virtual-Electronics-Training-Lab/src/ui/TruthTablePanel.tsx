@@ -15,13 +15,25 @@ export const TruthTablePanel: React.FC<TruthTablePanelProps> = ({ icType, circui
   const truthTableDef = GATE_TRUTH_TABLES[icType] || GATE_TRUTH_TABLES['7408'];
   const [verifiedRows, setVerifiedRows] = useState<Record<number, boolean>>({});
 
-  // Current switch state values
-  const swA = circuitState.switches.find((s) => s.label.includes('A'))?.state === 'HIGH' ? 1 : 0;
-  const swB = circuitState.switches.find((s) => s.label.includes('B'))?.state === 'HIGH' ? 1 : 0;
+  // Get current switch states for all inputs in the truth table
+  const currentInputs: Record<string, number> = {};
+  truthTableDef.inputNames.forEach((name) => {
+    const sw = circuitState.switches.find((s) => s.label.toUpperCase().includes(name.toUpperCase()));
+    currentInputs[name] = sw?.state === 'HIGH' ? 1 : 0;
+  });
 
-  // Current LED state
-  const ledOn = circuitState.leds.some((l) => simResult?.ledStates[l.id]?.isOn);
-  const observedOutput = ledOn ? 1 : 0;
+  const serializedInputs = JSON.stringify(currentInputs);
+
+  // Find up to 4 LEDs dynamically from the circuitState
+  const sumLed = circuitState.leds[0];
+  const carryLed = circuitState.leds[1];
+  const out3Led = circuitState.leds[2];
+  const out4Led = circuitState.leds[3];
+
+  const observed1 = sumLed ? (simResult?.ledStates[sumLed.id]?.isOn ? 1 : 0) : 0;
+  const observed2 = carryLed ? (simResult?.ledStates[carryLed.id]?.isOn ? 1 : 0) : 0;
+  const observed3 = out3Led ? (simResult?.ledStates[out3Led.id]?.isOn ? 1 : 0) : 0;
+  const observed4 = out4Led ? (simResult?.ledStates[out4Led.id]?.isOn ? 1 : 0) : 0;
 
   useEffect(() => {
     setVerifiedRows({});
@@ -30,11 +42,21 @@ export const TruthTablePanel: React.FC<TruthTablePanelProps> = ({ icType, circui
   useEffect(() => {
     // Check if current input state matches any row in the truth table
     truthTableDef.rows.forEach((row, idx) => {
-      const matchA = row.inputs['A'] === swA;
-      const matchB = row.inputs['B'] === undefined || row.inputs['B'] === swB;
+      let isMatch = true;
+      for (const name of truthTableDef.inputNames) {
+        if (row.inputs[name] !== currentInputs[name]) {
+          isMatch = false;
+          break;
+        }
+      }
 
-      if (matchA && matchB) {
-        if (observedOutput === row.expectedOutput) {
+      if (isMatch) {
+        const out1Ok = observed1 === row.expectedOutput;
+        const out2Ok = row.expectedCarry === undefined || observed2 === row.expectedCarry;
+        const out3Ok = row.expectedOut3 === undefined || observed3 === row.expectedOut3;
+        const out4Ok = row.expectedOut4 === undefined || observed4 === row.expectedOut4;
+
+        if (out1Ok && out2Ok && out3Ok && out4Ok) {
           setVerifiedRows((prev) => {
             if (prev[idx]) return prev;
             return { ...prev, [idx]: true };
@@ -42,7 +64,7 @@ export const TruthTablePanel: React.FC<TruthTablePanelProps> = ({ icType, circui
         }
       }
     });
-  }, [swA, swB, observedOutput, icType]);
+  }, [serializedInputs, observed1, observed2, observed3, observed4, icType]);
 
   const allVerified = truthTableDef.rows.every((_, idx) => verifiedRows[idx]);
 
@@ -59,6 +81,10 @@ export const TruthTablePanel: React.FC<TruthTablePanelProps> = ({ icType, circui
       triggerConfetti();
     }
   }, [allVerified]);
+
+  const hasCarryColumn = truthTableDef.rows[0]?.expectedCarry !== undefined;
+  const hasOut3Column = truthTableDef.rows[0]?.expectedOut3 !== undefined;
+  const hasOut4Column = truthTableDef.rows[0]?.expectedOut4 !== undefined;
 
   return (
     <div className="bg-[#12151B] border border-white/5 rounded-xl p-4 text-slate-200 shadow-2xl space-y-3 w-72 shrink-0">
@@ -84,15 +110,35 @@ export const TruthTablePanel: React.FC<TruthTablePanelProps> = ({ icType, circui
               </th>
             ))}
             <th className="py-2 text-[10px] font-mono text-white uppercase">
-              {truthTableDef.outputName} (Out)
+              {icType.includes('ADDER') ? 'Sum' : (icType.includes('GRAY') ? 'Out2' : (icType.includes('DECODER') ? 'Y0' : (icType.includes('COMPARATOR') ? 'A>B' : truthTableDef.outputName)))}
             </th>
+            {hasCarryColumn && (
+              <th className="py-2 text-[10px] font-mono text-emerald-400 uppercase">
+                {icType.includes('ADDER') ? 'Carry' : (icType.includes('GRAY') ? 'Out1' : (icType.includes('DECODER') ? 'Y1' : (icType.includes('COMPARATOR') ? 'A<B' : 'Out2')))}
+              </th>
+            )}
+            {hasOut3Column && (
+              <th className="py-2 text-[10px] font-mono text-amber-400 uppercase">
+                {icType.includes('GRAY') ? 'Out0' : (icType.includes('DECODER') ? 'Y2' : (icType.includes('COMPARATOR') ? 'A=B' : 'Out3'))}
+              </th>
+            )}
+            {hasOut4Column && (
+              <th className="py-2 text-[10px] font-mono text-blue-400 uppercase">
+                {icType.includes('DECODER') ? 'Y3' : 'Out4'}
+              </th>
+            )}
             <th className="py-2 text-[10px] font-mono text-slate-500 uppercase text-right">Status</th>
           </tr>
         </thead>
         <tbody className="text-xs font-mono">
           {truthTableDef.rows.map((row, idx) => {
-            const isCurrentRow =
-              row.inputs['A'] === swA && (row.inputs['B'] === undefined || row.inputs['B'] === swB);
+            let isCurrentRow = true;
+            for (const name of truthTableDef.inputNames) {
+              if (row.inputs[name] !== currentInputs[name]) {
+                isCurrentRow = false;
+                break;
+              }
+            }
             const isVerified = verifiedRows[idx];
 
             return (
@@ -104,9 +150,21 @@ export const TruthTablePanel: React.FC<TruthTablePanelProps> = ({ icType, circui
                     : 'text-slate-500 opacity-60 hover:opacity-100'
                 }`}
               >
-                <td className="py-2 pl-2">{row.inputs['A']}</td>
-                {row.inputs['B'] !== undefined && <td className="py-2">{row.inputs['B']}</td>}
+                {truthTableDef.inputNames.map((name, i) => (
+                  <td key={name} className={`py-2 ${i === 0 ? 'pl-2' : ''}`}>
+                    {row.inputs[name]}
+                  </td>
+                ))}
                 <td className="py-2 font-bold text-white">{row.expectedOutput}</td>
+                {hasCarryColumn && (
+                  <td className="py-2 font-bold text-emerald-400">{row.expectedCarry}</td>
+                )}
+                {hasOut3Column && (
+                  <td className="py-2 font-bold text-amber-400">{row.expectedOut3}</td>
+                )}
+                {hasOut4Column && (
+                  <td className="py-2 font-bold text-blue-400">{row.expectedOut4}</td>
+                )}
                 <td className="py-2 text-right">
                   {isVerified ? (
                     <CheckCircle2 className="w-3.5 h-3.5 text-green-400 inline" />

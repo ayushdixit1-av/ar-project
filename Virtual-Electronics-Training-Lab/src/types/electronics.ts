@@ -1,6 +1,6 @@
 export type LogicState = 'HIGH' | 'LOW' | 'FLOATING' | 'SHORT_CIRCUIT';
 
-export type ICType = '7400' | '7402' | '7404' | '7408' | '7432' | '7486';
+export type ICType = '7400' | '7402' | '7404' | '7408' | '7432' | '7486' | 'SOP' | 'POS' | 'HALF_ADDER' | 'FULL_ADDER' | 'BIN_TO_GRAY' | 'GRAY_TO_BIN' | 'DECODER_2X4' | 'MUX_4X1' | 'COMPARATOR_1BIT' | 'FF_SR' | 'FF_D' | 'COUNTER_ASYNC' | 'REG_PIPO';
 
 export interface ICPin {
   pinNumber: number; // 1 to 14
@@ -96,7 +96,10 @@ export interface CircuitState {
 
 export interface TruthTableRow {
   inputs: Record<string, number>; // e.g. { A: 0, B: 0 }
-  expectedOutput: number; // 0 or 1
+  expectedOutput: number; // 0 or 1 (Sum or Out 1)
+  expectedCarry?: number; // 0 or 1 (Carry or Out 2)
+  expectedOut3?: number;  // 0 or 1 (Out 3)
+  expectedOut4?: number;  // 0 or 1 (Out 4)
   observedOutput: number | null; // 0 or 1 or null
   verified: boolean;
 }
