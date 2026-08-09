@@ -38,7 +38,8 @@ export class ARManager {
 
     try {
       const session = await (navigator as any).xr.requestSession('immersive-ar', {
-        optionalFeatures: ['local', 'local-floor'],
+        requiredFeatures: ['local'],
+        optionalFeatures: ['local-floor'],
       });
 
       renderer.xr.enabled = true;

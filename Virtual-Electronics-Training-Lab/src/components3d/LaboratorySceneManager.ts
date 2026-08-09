@@ -568,6 +568,7 @@ export class LaboratorySceneManager {
     // 1. Clear background color and fog for pass-through transparency
     this.scene.background = null;
     this.scene.fog = null;
+    this.renderer.setClearColor(0x000000, 0); // Transparent clear color for AR feed
 
     // 2. Scale down the entire lab workbench to fit beautifully in physical room
     this.workbenchGroup.scale.set(0.12, 0.12, 0.12);
@@ -584,6 +585,7 @@ export class LaboratorySceneManager {
     // 1. Restore obsidian laboratory background and fog
     this.scene.background = new THREE.Color(0x0a0b0e);
     this.scene.fog = new THREE.FogExp2(0x0a0b0e, 0.02);
+    this.renderer.setClearColor(0x0a0b0e, 1); // Restore opaque clear color
 
     // 2. Restore workbench scale and position to desktop layout
     this.workbenchGroup.scale.set(1, 1, 1);

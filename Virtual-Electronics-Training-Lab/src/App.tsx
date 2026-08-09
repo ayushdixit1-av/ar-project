@@ -436,17 +436,20 @@ export default function App() {
         onLaunchWebXR={() => {
           if (sceneManagerRef.current) {
             sceneManagerRef.current.enterARMode();
+            setIsARModalOpen(false); // Hide overlay modal so it doesn't block the AR screen feed
             arManager.startARSession(sceneManagerRef.current.renderer, {
               onSessionEnd: () => {
                 if (sceneManagerRef.current) {
                   sceneManagerRef.current.exitARMode();
                 }
+                setIsARModalOpen(true); // Re-open the modal when user exits AR session
               },
               onError: (err) => {
                 alert(err);
                 if (sceneManagerRef.current) {
                   sceneManagerRef.current.exitARMode();
                 }
+                setIsARModalOpen(true);
               },
             });
           }
