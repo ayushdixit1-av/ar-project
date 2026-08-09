@@ -43,6 +43,7 @@ export class ARManager {
       });
 
       renderer.xr.enabled = true;
+      renderer.xr.setReferenceSpaceType('local');
       await renderer.xr.setSession(session);
 
       if (options.onSessionStart) options.onSessionStart();
