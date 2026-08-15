@@ -41,6 +41,10 @@ class ElectronicsAudioEngine {
     }
   }
 
+  public playSwitchClick(isOn: boolean) {
+    this.playPowerClick(isOn);
+  }
+
   public setBuzzerTone(freqHz: number) {
     try {
       this.initCtx();

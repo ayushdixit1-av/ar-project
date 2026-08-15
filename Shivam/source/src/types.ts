@@ -32,6 +32,10 @@ export interface ElectronicComponentMeta {
   operatingVoltage: string;
   operatingCurrent: string;
   icSeries?: string;
+  gateName?: string;
+  gateFunction?: string;
+  gateCountText?: string;
+  logicExpressionDisplay?: string;
   logicSymbolType?: 'AND' | 'OR' | 'NAND' | 'NOR' | 'NOT' | 'XOR';
   booleanEquation?: string;
   truthTableData?: { a: number; b?: number; out: number }[];
@@ -162,6 +166,7 @@ export interface SimulationState {
   totalCurrentmA: number;
   hasShortCircuit: boolean;
   shortCircuitMsg?: string;
+  internalState?: Record<string, any>;
   
   // Logic Inputs (10 Input Switches SW1 - SW10)
   inputs: boolean[];
@@ -177,6 +182,7 @@ export interface SimulationState {
   lightLux: number;
   potentiometerVal: number;
   button1Pressed: boolean;
+  autoClockPulse?: boolean;
   
   // Serial console output
   serialMonitorLog: string[];

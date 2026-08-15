@@ -35,6 +35,8 @@ interface Trainer3DViewportProps {
   onAddWire: (fromCompId: string, fromPinId: string, toCompId: string, toPinId: string) => void;
   simState: SimulationState;
   onToggleInput?: (index: number) => void;
+  onTogglePower?: () => void;
+  onToggleClock?: () => void;
   onShiftToAR?: () => void;
   isARMode?: boolean;
 }
@@ -51,6 +53,8 @@ export const Trainer3DViewport: React.FC<Trainer3DViewportProps> = ({
   onAddWire,
   simState,
   onToggleInput,
+  onToggleClock,
+  onTogglePower,
   onShiftToAR,
   isARMode = false,
 }) => {
@@ -97,7 +101,7 @@ export const Trainer3DViewport: React.FC<Trainer3DViewportProps> = ({
 
     // Camera
     const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
-    camera.position.set(0, 8, 12);
+    camera.position.set(0, 10, 14);
     camera.lookAt(0, 0, 0);
     cameraRef.current = camera;
 
@@ -410,7 +414,15 @@ export const Trainer3DViewport: React.FC<Trainer3DViewportProps> = ({
     if (intersects.length > 0) {
       let hitObj: THREE.Object3D | null = intersects[0].object;
 
-      // 1. Check if 3D Input Switch Lever or Box clicked
+      // 1. Check if 3D Rocker / Toggle Power Switch clicked
+      if (hitObj.name && (hitObj.name.startsWith('power-switch') || hitObj.name === 'power-switch-rocker' || hitObj.name === 'power-switch-box' || hitObj.name === 'power-switch-lever')) {
+        if (onTogglePower) {
+          onTogglePower();
+          return;
+        }
+      }
+
+      // 2. Check if 3D Input Switch Lever or Box clicked
       if (hitObj.name && (hitObj.name.startsWith('switch-lever-') || hitObj.name.startsWith('switch-box-'))) {
         const swIndex = parseInt(hitObj.name.replace('switch-lever-', '').replace('switch-box-', ''), 10);
         if (!isNaN(swIndex) && onToggleInput) {
@@ -419,7 +431,13 @@ export const Trainer3DViewport: React.FC<Trainer3DViewportProps> = ({
         }
       }
 
-      // 2. Check if pin clicked
+      // Clock Button
+      if (hitObj.name === 'clock-pulse-btn') {
+        if (onToggleClock) onToggleClock();
+        return;
+      }
+      
+      // 3. Check if pin clicked
       let pinData: any = null;
       hitObj.traverseAncestors((ancestor) => {
         if (ancestor.userData?.pinMeta) {

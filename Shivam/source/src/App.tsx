@@ -10,98 +10,27 @@ import {
 } from './types';
 import { COMPONENTS_LIBRARY } from './data/componentsLibrary';
 import { evaluateDigitalCircuit } from './utils/logicEngine';
+import { audioSynth } from './utils/audioSynth';
 import { HeaderNav } from './components/HeaderNav';
+import { CIRCUIT_PRESETS } from './data/presets';
 import { Trainer3DViewport } from './components/Trainer3DViewport';
 import { LeftSidebarLibrary } from './components/LeftSidebarLibrary';
 import { RightSidebarInspector } from './components/RightSidebarInspector';
 import { BottomConsoleToolbar } from './components/BottomConsoleToolbar';
-import { MultimeterOverlay } from './components/MultimeterOverlay';
-import { AITeacherDrawer } from './components/AITeacherDrawer';
 import { TruthTableVerificationView } from './components/TruthTableVerificationView';
 import { InternalICXRayModal } from './components/InternalICXRayModal';
 import { ArchitectureModal } from './components/ArchitectureModal';
 import { SyncMobileModal } from './components/SyncMobileModal';
 import { ActiveItemsMenu } from './components/ActiveItemsMenu';
 import { ARModeView } from './components/ARModeView';
-import { Activity, Bot, Eye, Zap, ShieldAlert, Sparkles, RefreshCw, Layers, Camera } from 'lucide-react';
+import { Eye, Activity, Zap, ShieldAlert, Sparkles, RefreshCw, Layers, Camera, Play, Square } from 'lucide-react';
 
 export default function App() {
   // Initial Placed Components (Includes Trainer Base, Breadboard, and 7408 AND Gate IC)
-  const [placedComponents, setPlacedComponents] = useState<PlacedComponent[]>([
-    {
-      id: 'comp-base',
-      componentMetaId: 'trainer-board-base',
-      label: 'Trainer Board Base Platform',
-      position: [0, 0, 0],
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
-    },
-    {
-      id: 'comp-bb',
-      componentMetaId: 'breadboard-830',
-      label: 'Solderless Breadboard',
-      position: [0, 0.4, 0],
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
-    },
-    {
-      id: 'comp-ic-7408',
-      componentMetaId: 'ic-7408-and',
-      label: '7408 Quad 2-Input AND Gate IC',
-      position: [0, 0.65, 0],
-      rotation: [0, 0, 0],
-      scale: [1, 1, 1],
-    },
-  ]);
+  const [placedComponents, setPlacedComponents] = useState<PlacedComponent[]>(CIRCUIT_PRESETS[0].components);
 
   // Initial Demonstration Wires: Pin 14 (+5V), Pin 7 (GND), SW1 -> Pin 1, SW2 -> Pin 2, Pin 3 -> OUT1 LED
-  const [wires, setWires] = useState<JumperWire[]>([
-    {
-      id: 'wire-vcc',
-      fromComponentId: 'comp-base',
-      fromPinId: 'tb-vcc1',
-      toComponentId: 'comp-ic-7408',
-      toPinId: 'pin-14',
-      color: '#ef4444',
-      isEnergized: true,
-    },
-    {
-      id: 'wire-gnd',
-      fromComponentId: 'comp-base',
-      fromPinId: 'tb-gnd1',
-      toComponentId: 'comp-ic-7408',
-      toPinId: 'pin-7',
-      color: '#3b82f6',
-      isEnergized: false,
-    },
-    {
-      id: 'wire-in1',
-      fromComponentId: 'comp-base',
-      fromPinId: 'tb-in1',
-      toComponentId: 'comp-ic-7408',
-      toPinId: 'pin-1',
-      color: '#eab308',
-      isEnergized: true,
-    },
-    {
-      id: 'wire-in2',
-      fromComponentId: 'comp-base',
-      fromPinId: 'tb-in2',
-      toComponentId: 'comp-ic-7408',
-      toPinId: 'pin-2',
-      color: '#22c55e',
-      isEnergized: true,
-    },
-    {
-      id: 'wire-out1',
-      fromComponentId: 'comp-ic-7408',
-      fromPinId: 'pin-3',
-      toComponentId: 'comp-base',
-      toPinId: 'tb-out1',
-      color: '#ef4444',
-      isEnergized: true,
-    },
-  ]);
+  const [wires, setWires] = useState<JumperWire[]>(CIRCUIT_PRESETS[0].wires.map(w => ({ ...w, isEnergized: false, logicState: 0, voltage: 0 })));
 
   // Central Simulation State
   const [simState, setSimState] = useState<SimulationState>({
@@ -110,8 +39,8 @@ export default function App() {
     totalCurrentmA: 48,
     hasShortCircuit: false,
     inputs: [true, true, false, false, false, false, false, false, false, false],
-    switchAOn: true,
-    switchBOn: true,
+    switchAOn: CIRCUIT_PRESETS[0].inputs[0],
+    switchBOn: CIRCUIT_PRESETS[0].inputs[1],
     outputs: [true, false, false, false, false, false, false, false, false, false],
     ambientTempC: 24.5,
     distanceCm: 15,
@@ -119,7 +48,7 @@ export default function App() {
     potentiometerVal: 50,
     button1Pressed: false,
     serialMonitorLog: [
-      '[AETHER Digital Logic Engine v3.5] Power On Self-Test Complete.',
+      '[Digital Logic Engine v3.5] Power On Self-Test Complete.',
       '[Circuit Status] 7408 Quad 2-Input AND Gate IC detected on Breadboard.',
       '[Logic Inputs] Switch A = HIGH (1), Switch B = HIGH (1). Output Pin 3 = HIGH (1).',
     ],
@@ -149,8 +78,6 @@ export default function App() {
   const [selectedComponent, setSelectedComponent] = useState<PlacedComponent | null>(placedComponents[2]);
 
   // Floating Overlays & Modals
-  const [showMultimeterOverlay, setShowMultimeterOverlay] = useState<boolean>(false);
-  const [showAITeacherDrawer, setShowAITeacherDrawer] = useState<boolean>(false);
   const [showXRayModal, setShowXRayModal] = useState<boolean>(false);
   const [showActiveItemsMenu, setShowActiveItemsMenu] = useState<boolean>(false);
   const [isDocsOpen, setIsDocsOpen] = useState<boolean>(false);
@@ -160,14 +87,32 @@ export default function App() {
   useEffect(() => {
     const evaluated = evaluateDigitalCircuit(placedComponents, wires, simState);
     setSimState(evaluated.updatedSimState);
-  }, [simState.isPowered, simState.switchAOn, simState.switchBOn, placedComponents, wires]);
+  }, [simState.isPowered, simState.switchAOn, simState.switchBOn, simState.button1Pressed, simState.inputs?.join(','), placedComponents, wires]);
 
   // Toggle Input Switches 1 - 10
+  const handleLoadPreset = (presetId: string) => {
+    const preset = CIRCUIT_PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+    setPlacedComponents(preset.components);
+    setWires(preset.wires.map((w: any) => ({ ...w, isEnergized: false, logicState: 0, voltage: 0 })));
+    setSimState(prev => ({
+      ...prev,
+      inputs: [...preset.inputs],
+      switchAOn: preset.inputs[0],
+      switchBOn: preset.inputs[1],
+      isPowered: false,
+      internalState: {},
+    }));
+    audioSynth.playSwitchClick(true);
+    setSelectedComponent(null);
+  };
+
   const handleToggleInputIndex = (index: number) => {
     setSimState((prev) => {
       const currentInputs = prev.inputs || new Array(10).fill(false);
       const nextInputs = [...currentInputs];
       nextInputs[index] = !nextInputs[index];
+      audioSynth.playSwitchClick(nextInputs[index]);
       return {
         ...prev,
         inputs: nextInputs,
@@ -181,39 +126,81 @@ export default function App() {
     });
   };
 
+  // Toggle 5V DC Power Supply
+  const handleToggleClock = () => {
+    setSimState((prev) => {
+      audioSynth.playSwitchClick(true);
+      setTimeout(() => {
+        setSimState(s => ({ ...s, button1Pressed: false }));
+      }, 200);
+      return { ...prev, button1Pressed: true };
+    });
+  };
+
+  const handleTogglePower = () => {
+    setSimState((prev) => {
+      const nextPower = !prev.isPowered;
+      audioSynth.playSwitchClick(nextPower);
+      return {
+        ...prev,
+        isPowered: nextPower,
+        serialMonitorLog: [
+          `[${new Date().toLocaleTimeString()}] System Power ${nextPower ? 'ENABLED (5.0V DC Rail Active)' : 'DISABLED'}`,
+          ...prev.serialMonitorLog,
+        ],
+      };
+    });
+  };
+
   const handleToggleSwitch = (sw: 'A' | 'B') => {
     handleToggleInputIndex(sw === 'A' ? 0 : 1);
   };
 
-  // Add Component onto Breadboard
+  // Add Component onto Breadboard (Capable of holding 4 ICs simultaneously)
   const handleAddComponent = (meta: ElectronicComponentMeta) => {
-    // Count existing ICs/modules on breadboard
-    const existingICs = placedComponents.filter((c) => c.id !== 'comp-base' && c.id !== 'comp-bb');
-    const icCount = existingICs.length;
+    // 4 Discrete Breadboard DIP IC Sockets along the central divider trough
+    const IC_SLOT_X_POSITIONS = [-2.63, -0.02, 2.58, 5.18];
 
-    // Position 3 ICs on breadboard with min 4 pin spacing (2.88 units step = 5 pin hole gap)
-    let posX = 0;
-    if (icCount === 1) {
-      posX = -2.88; // 2nd IC on Left
-    } else if (icCount === 2) {
-      posX = 2.88; // 3rd IC on Right
-    } else if (icCount > 2) {
-      const stepIndex = Math.floor(icCount / 2);
-      const side = icCount % 2 === 1 ? -1 : 1;
-      posX = side * stepIndex * 2.88;
-      if (Math.abs(posX) > 4.2) posX = (Math.random() - 0.5) * 2;
+    // Filter existing placed ICs
+    const existingICs = placedComponents.filter((c) => c.id !== 'comp-base' && c.id !== 'comp-bb');
+    
+    // Find occupied slot indices
+    const occupiedPositions = existingICs.map((c) => c.position[0]);
+    const vacantSlot = IC_SLOT_X_POSITIONS.find(
+      (slotX) => !occupiedPositions.some((ox) => Math.abs(ox - slotX) < 0.6)
+    );
+
+    let targetX = 0;
+    let updatedPlacedList = [...placedComponents];
+
+    if (vacantSlot !== undefined) {
+      targetX = vacantSlot;
+    } else {
+      // If 4 ICs already present, notify and return
+      alert('Maximum of 4 ICs can be placed on the breadboard at once.');
+      return;
     }
+
+    const slotNum = IC_SLOT_X_POSITIONS.indexOf(targetX) + 1 || 1;
 
     const newPlaced: PlacedComponent = {
       id: `comp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       componentMetaId: meta.id,
       label: meta.name,
-      position: [posX, 0.65, 0],
+      position: [targetX, 0.47, 0.35],
       rotation: [0, 0, 0],
       scale: [1, 1, 1],
     };
-    setPlacedComponents((prev) => [...prev, newPlaced]);
+
+    setPlacedComponents([...updatedPlacedList, newPlaced]);
     setSelectedComponent(newPlaced);
+    setSimState((prev) => ({
+      ...prev,
+      serialMonitorLog: [
+        `[Breadboard Socket ${slotNum}] Mounted ${meta.name} on Breadboard (Slot ${slotNum} of 4).`,
+        ...prev.serialMonitorLog,
+      ],
+    }));
   };
 
   // Remove Placed Component
@@ -269,27 +256,6 @@ export default function App() {
     setWires([]);
   };
 
-  // Multimeter Probe Handlers
-  const handleAttachMultimeterProbe = (probe: 'red' | 'black', componentId: string, pinId: string) => {
-    setSimState((prev) => ({
-      ...prev,
-      multimeter: {
-        ...prev.multimeter,
-        [probe === 'red' ? 'redProbeAttachedTo' : 'blackProbeAttachedTo']: { componentId, pinId },
-      },
-    }));
-  };
-
-  const handleDetachMultimeterProbe = (probe: 'red' | 'black') => {
-    setSimState((prev) => ({
-      ...prev,
-      multimeter: {
-        ...prev.multimeter,
-        [probe === 'red' ? 'redProbeAttachedTo' : 'blackProbeAttachedTo']: null,
-      },
-    }));
-  };
-
   // Auto-Wire Tutorial Helper
   const handleAutoWireTutorial = (tutorial: InteractiveTutorial) => {
     const autoWires: JumperWire[] = [];
@@ -320,19 +286,19 @@ export default function App() {
 
   return (
     <div className="w-screen h-screen bg-[#050505] text-white flex flex-col font-sans overflow-hidden select-none">
-      {/* Top Navigation Header */}
       <HeaderNav
         activeView={activeView}
         setActiveView={setActiveView}
         simState={simState}
         setSimState={setSimState}
-        placedCount={placedComponents.length}
+        placedCount={placedComponents.length - 2}
         wireCount={wires.length}
         onOpenDocs={() => setIsDocsOpen(true)}
         onOpenMobileSync={() => setIsMobileSyncOpen(true)}
         onOpenActiveItemsMenu={() => setShowActiveItemsMenu(true)}
+        presets={CIRCUIT_PRESETS}
+        onLoadPreset={handleLoadPreset}
       />
-
       {/* Main View Container */}
       <div className="flex-1 flex overflow-hidden relative">
         {/* VIEW MODE: DIRECT AUGMENTED REALITY (AR) PASSTHROUGH */}
@@ -388,18 +354,51 @@ export default function App() {
                 onAddWire={handleAddWire}
                 simState={simState}
                 onToggleInput={handleToggleInputIndex}
+                onTogglePower={handleTogglePower}
+                onToggleClock={handleToggleClock}
                 onShiftToAR={() => setActiveView('ar')}
               />
 
-              {/* Floating Quick Logic Switch Injector Panel */}
-              <div className="absolute top-2 sm:top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2 shadow-2xl flex items-center gap-2 sm:gap-3 z-10 text-[11px] sm:text-xs max-w-[95vw] sm:max-w-4xl overflow-x-auto custom-scrollbar">
+              {/* Floating Quick Logic Control & Switch Injector Panel */}
+              <div className="absolute top-2 sm:top-4 left-1/2 -translate-x-1/2 bg-slate-900/90 backdrop-blur-md border border-slate-700/80 rounded-xl px-2.5 sm:px-4 py-1.5 sm:py-2 shadow-2xl flex items-center gap-2 sm:gap-3 z-10 text-[11px] sm:text-xs max-w-[95vw] sm:max-w-5xl overflow-x-auto custom-scrollbar">
+                {/* Clock Pulse */}
+                <button
+                  onMouseDown={handleToggleClock}
+                  className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold transition-all border shrink-0 text-[10px] sm:text-xs ${
+                    (simState.button1Pressed || simState.autoClockPulse)
+                      ? 'bg-red-500 text-white border-red-400 shadow-[0_0_15px_rgba(239,68,68,0.5)]'
+                      : 'bg-slate-800 text-red-400 border-red-900/50 hover:bg-slate-700'
+                  }`}
+                >
+                  <Activity className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  CLOCK PULSE
+                </button>
+                <div className="w-px h-6 bg-slate-700 mx-0.5 sm:mx-1 shrink-0"></div>
+
+                {/* Power Toggle Switch */}
+                <button
+                  onClick={handleTogglePower}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold transition-all shadow-md shrink-0 ${
+                    simState.isPowered
+                      ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-400 shadow-[0_0_12px_rgba(16,185,129,0.25)]'
+                      : 'bg-rose-500/10 border-rose-500/30 text-rose-400 hover:bg-rose-500/20'
+                  }`}
+                  title="Toggle 5V DC Power Rail"
+                >
+                  <Play className={`w-3.5 h-3.5 fill-current ${simState.isPowered ? 'hidden' : 'block'}`} />
+                  <Square className={`w-3.5 h-3.5 fill-current ${simState.isPowered ? 'block' : 'hidden'}`} />
+                  <span>{simState.isPowered ? 'POWER ON' : 'POWER OFF'}</span>
+                </button>
+
+                <div className="h-4 w-px bg-slate-700 shrink-0" />
+
                 <div className="flex items-center gap-1.5 font-semibold text-slate-200 shrink-0">
                   <Zap className="w-4 h-4 text-amber-400" />
                   <span>10 Inputs:</span>
                 </div>
 
                 <div className="flex items-center gap-1 overflow-x-auto py-0.5">
-                  {(simState.inputs || new Array(10).fill(false)).map((isHigh, idx) => (
+                  {(simState.inputs || new Array(10).fill(false)).slice(0, 4).map((isHigh, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleToggleInputIndex(idx)}
@@ -450,7 +449,7 @@ export default function App() {
                 {selectedMeta && selectedMeta.category === 'Logic & IC' && (
                   <button
                     onClick={() => setShowXRayModal(true)}
-                    className="ml-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20"
+                    className="ml-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/20 shrink-0"
                   >
                     <Eye className="w-3.5 h-3.5" />
                     <span>IC X-Ray View</span>
@@ -463,7 +462,7 @@ export default function App() {
                   selectedComponent.id !== 'comp-bb' && (
                     <button
                       onClick={() => handleRemoveComponent(selectedComponent.id)}
-                      className="ml-1 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all shadow-md"
+                      className="ml-1 bg-rose-500/20 hover:bg-rose-500/30 border border-rose-500/40 text-rose-300 px-3 py-1.5 rounded-lg font-medium flex items-center gap-1.5 transition-all shadow-md shrink-0"
                       title="Remove selected object from board"
                     >
                       <ShieldAlert className="w-3.5 h-3.5" />
@@ -471,109 +470,24 @@ export default function App() {
                     </button>
                   )}
               </div>
-
-              {/* Floating Toggle Buttons for Multimeter & AI Assistant */}
-              <div className="absolute bottom-4 right-4 flex items-center gap-2 z-20">
-                <button
-                  onClick={() => setShowMultimeterOverlay(!showMultimeterOverlay)}
-                  className={`p-2.5 rounded-xl border font-semibold text-xs flex items-center gap-2 transition-all shadow-xl ${
-                    showMultimeterOverlay
-                      ? 'bg-amber-500 text-slate-950 border-amber-400 shadow-amber-500/20'
-                      : 'bg-slate-900/90 text-slate-300 border-slate-700 hover:bg-slate-800'
-                  }`}
-                >
-                  <Activity className="w-4 h-4" />
-                  <span>{showMultimeterOverlay ? 'Hide Multimeter' : 'Multimeter Probe'}</span>
-                </button>
-
-                <button
-                  onClick={() => setShowAITeacherDrawer(!showAITeacherDrawer)}
-                  className={`p-2.5 rounded-xl border font-semibold text-xs flex items-center gap-2 transition-all shadow-xl ${
-                    showAITeacherDrawer
-                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-indigo-600/30'
-                      : 'bg-slate-900/90 text-slate-300 border-slate-700 hover:bg-slate-800'
-                  }`}
-                >
-                  <Bot className="w-4 h-4" />
-                  <span>AI Professor</span>
-                </button>
-              </div>
-
-              {/* Multimeter Overlay Floating Window */}
-              {showMultimeterOverlay && (
-                <div className="absolute bottom-16 right-2 sm:right-4 max-w-[92vw] z-20">
-                  <MultimeterOverlay
-                    multimeter={simState.multimeter}
-                    placedComponents={placedComponents}
-                    onChangeMode={(mode) =>
-                      setSimState((prev) => ({ ...prev, multimeter: { ...prev.multimeter, mode } }))
-                    }
-                    onAttachProbe={handleAttachMultimeterProbe}
-                    onDetachProbe={handleDetachMultimeterProbe}
-                  />
-                </div>
-              )}
             </main>
 
-            {/* AI Teacher Sidebar or Right Inspector Sidebar */}
-            {showAITeacherDrawer ? (
-              <div className="w-96 max-lg:fixed max-lg:right-0 max-lg:top-14 max-lg:bottom-0 max-lg:w-80 max-sm:w-[85vw] max-lg:z-40 h-full max-lg:shadow-2xl">
-                <AITeacherDrawer
-                  onClose={() => setShowAITeacherDrawer(false)}
-                  simState={simState}
-                  setSimState={setSimState}
-                  placedComponents={placedComponents}
-                  setPlacedComponents={setPlacedComponents}
-                  wires={wires}
-                  setWires={setWires}
-                  selectedIC={selectedComponent}
-                  onAddComponent={handleAddComponent}
-                  onRemoveComponent={handleRemoveComponent}
-                  onAddWire={handleAddWire}
-                  onRemoveWire={handleRemoveWire}
-                  onClearAllWires={handleClearAllWires}
-                />
-              </div>
-            ) : (
-              <RightSidebarInspector
-                selectedComponent={selectedComponent}
-                placedComponents={placedComponents}
-                wires={wires}
-                simState={simState}
-                setSimState={setSimState}
-                activeView={activeView}
-                setActiveView={setActiveView}
-                onAutoWireTutorial={handleAutoWireTutorial}
-                onRemoveComponent={handleRemoveComponent}
-                onRemoveWire={handleRemoveWire}
-              />
-            )}
+            {/* Right Inspector Sidebar */}
+            <RightSidebarInspector
+              selectedComponent={selectedComponent}
+              placedComponents={placedComponents}
+              wires={wires}
+              simState={simState}
+              setSimState={setSimState}
+              activeView={activeView}
+              setActiveView={setActiveView}
+              onAutoWireTutorial={handleAutoWireTutorial}
+              onRemoveComponent={handleRemoveComponent}
+              onRemoveWire={handleRemoveWire}
+            />
           </>
         )}
       </div>
-
-      {/* Dedicated Mobile Floating Action Button for AR Mode */}
-      {activeView !== 'ar' && (
-        <button
-          onClick={() => setActiveView('ar')}
-          className="lg:hidden fixed bottom-16 right-4 z-40 bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-600 text-white font-mono text-xs font-bold px-4 py-2.5 rounded-full shadow-2xl shadow-purple-600/50 border-2 border-purple-300/50 flex items-center gap-2 hover:scale-105 active:scale-95 transition-all animate-bounce"
-          title="Directly shift to Augmented Reality (AR) Camera Mode"
-        >
-          <Camera className="w-4 h-4 text-purple-200" />
-          <span>AR MODE</span>
-        </button>
-      )}
-
-      {/* Bottom Console Toolbar */}
-      <BottomConsoleToolbar
-        simState={simState}
-        wireCount={wires.length}
-        placedCount={placedComponents.length}
-        onResetView={() => setSelectedComponent(null)}
-        onClearWires={handleClearAllWires}
-        onDownloadConfig={() => {}}
-        onShiftToAR={() => setActiveView('ar')}
-      />
 
       {/* Internal IC X-Ray Inspection Modal */}
       {showXRayModal && selectedMeta && (

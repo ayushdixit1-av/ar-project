@@ -1,7 +1,6 @@
 export const BLENDER_PYTHON_SCRIPT_CODE = `# ==============================================================================
-# AETHER AR ELECTRONICS TRAINER KIT - AUTOMATED BLENDER 3D ASSET GENERATOR
+# DIGITAL LOGIC TRAINER - AUTOMATED BLENDER 3D ASSET GENERATOR
 # Language: Python 3.10+ (Blender 3.x / 4.x API)
-# Author: Senior 3D Electronics Architect
 # Target: GLTF/GLB PBR Production Pipeline with Pin Snap Anchors & LOD Support
 # ==============================================================================
 
@@ -11,8 +10,8 @@ import json
 import os
 
 def create_trainer_board_base():
-    """Generates the main AETHER Trainer Kit baseboard with mounting holes, rails & silkscreen."""
-    print("[AETHER] Generating Trainer Base Board...")
+    """Generates the main Digital Logic Trainer Kit baseboard with mounting holes, rails & silkscreen."""
+    print("[Trainer] Generating Trainer Base Board...")
     
     # 1. Clear default scene objects
     bpy.ops.object.select_all(action='SELECT')
@@ -46,7 +45,7 @@ def create_trainer_board_base():
     bpy.ops.object.select_all(action='SELECT')
     bpy.ops.object.shade_smooth()
     
-    print("[AETHER] Baseboard geometry generated successfully.")
+    print("[Trainer] Baseboard geometry generated successfully.")
 
 def add_pin_header(location, name, color=(0.8, 0.7, 0.1, 1.0)):
     """Helper to generate metallic pin connectors with snap metadata Empty objects."""
@@ -70,7 +69,7 @@ def add_pin_header(location, name, color=(0.8, 0.7, 0.1, 1.0)):
 
 def export_gltf_pbr(output_path):
     """Exports scene to GLTF 2.0 with embedded PBR materials & LODs."""
-    print(f"[AETHER] Exporting GLB asset to: {output_path}")
+    print(f"[Trainer] Exporting GLB asset to: {output_path}")
     bpy.ops.export_scene.gltf(
         filepath=output_path,
         export_format='GLB',
@@ -82,7 +81,7 @@ def export_gltf_pbr(output_path):
 
 if __name__ == "__main__":
     create_trainer_board_base()
-    export_dir = os.path.join(os.path.expanduser("~"), "aether_gltf_export")
+    export_dir = os.path.join(os.path.expanduser("~"), "trainer_gltf_export")
     os.makedirs(export_dir, exist_ok=True)
-    export_gltf_pbr(os.path.join(export_dir, "AETHER_Trainer_Baseboard.glb"))
+    export_gltf_pbr(os.path.join(export_dir, "Trainer_Baseboard.glb"))
 `;

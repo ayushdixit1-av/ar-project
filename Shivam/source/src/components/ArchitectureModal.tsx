@@ -30,7 +30,7 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
             </div>
             <div>
               <h2 className="text-sm font-bold text-white tracking-wide font-mono">
-                AETHER AR Architecture & Blender Asset Automation
+                Digital Logic Trainer Architecture & Blender Automation
               </h2>
               <p className="text-[11px] text-gray-400">Technical Specifications & Python 3D Asset Generators</p>
             </div>
@@ -117,7 +117,7 @@ export const ArchitectureModal: React.FC<ArchitectureModalProps> = ({ isOpen, on
               <div className="p-4 bg-[#0a0a0f] border border-white/10 rounded-xl space-y-2">
                 <h3 className="text-sm font-bold text-blue-400">Project Directory Layout</h3>
                 <pre className="text-[11px] text-gray-400 leading-relaxed">
-                  {`aether-electronics-trainer/
+                  {`digital-logic-trainer/
 ├── src/
 │   ├── components/
 │   │   ├── HeaderNav.tsx              # Top navigation & system power switch
