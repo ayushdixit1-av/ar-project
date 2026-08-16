@@ -60,7 +60,25 @@ class AppManager {
       });
     }
 
-    // 3. Mode Tabs Switcher (4x1 MUX, 8x1 MUX, Challenge, Sandbox)
+    // 3. Show Solution Buttons (Header & Side Panel)
+    const solBtns = [document.getElementById('btn-show-solution'), document.getElementById('btn-show-solution-side')];
+    const solModal = document.getElementById('modal-solution');
+    const closeSol = document.getElementById('close-solution');
+
+    solBtns.forEach(btn => {
+      if (btn) {
+        btn.addEventListener('click', () => {
+          this.revealSolution();
+          if (solModal) solModal.classList.add('open');
+        });
+      }
+    });
+
+    if (closeSol && solModal) {
+      closeSol.addEventListener('click', () => solModal.classList.remove('open'));
+    }
+
+    // 4. Mode Tabs Switcher (4x1 MUX, 8x1 MUX, Challenge, Sandbox)
     document.querySelectorAll('.mode-tab').forEach(tab => {
       tab.addEventListener('click', (e) => {
         document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
@@ -69,7 +87,6 @@ class AppManager {
         const mode = e.target.dataset.mode;
         this.gamification.setMode(mode);
 
-        // Place default appropriate IC chip for selected mode
         if (mode === '4x1_MUX') {
           this.breadboard.placeIC('74153', 25);
         } else if (mode === '8x1_MUX' || mode === 'CHALLENGE') {
@@ -81,7 +98,7 @@ class AppManager {
       });
     });
 
-    // 4. IC Drawer Click / Drag Placement
+    // 5. IC Drawer Click / Drag Placement
     document.querySelectorAll('.ic-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const chipType = e.currentTarget.dataset.chip;
@@ -96,7 +113,6 @@ class AppManager {
       });
     });
 
-    // Allow dropping IC directly on canvas container
     const container = document.getElementById('workbench-container');
     if (container) {
       container.addEventListener('dragover', (e) => e.preventDefault());
@@ -115,7 +131,7 @@ class AppManager {
       });
     }
 
-    // 5. Wire Color Palette Selection
+    // 6. Wire Color Palette Selection
     document.querySelectorAll('.color-swatch').forEach(swatch => {
       swatch.addEventListener('click', (e) => {
         document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
@@ -126,7 +142,7 @@ class AppManager {
       });
     });
 
-    // 6. Action Tools: Logic Probe, Clear Wires, Auto-Wire Preset
+    // 7. Action Tools: Logic Probe, Clear Wires, Auto-Wire Preset
     const probeBtn = document.getElementById('btn-probe');
     if (probeBtn) {
       probeBtn.addEventListener('click', () => {
@@ -151,7 +167,7 @@ class AppManager {
       });
     }
 
-    // 7. Modals: Datasheet popup
+    // 8. Modals: Datasheet popup
     const dsBtn = document.getElementById('btn-datasheet');
     const dsModal = document.getElementById('modal-datasheet');
     const closeDs = document.getElementById('close-datasheet');
@@ -166,7 +182,7 @@ class AppManager {
       closeDs.addEventListener('click', () => dsModal.classList.remove('open'));
     }
 
-    // 8. Trainer Switch Clicks
+    // 9. Trainer Switch Clicks
     this.breadboard.canvas.addEventListener('click', (e) => {
       const rect = this.breadboard.canvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -207,6 +223,76 @@ class AppManager {
         return;
       }
     });
+  }
+
+  /**
+   * Reveal Solution: Auto-wires circuit, sets switches, and displays complete step-by-step wiring guide
+   */
+  revealSolution() {
+    // 1. Perform Auto-Wire
+    this.applyAutoWirePreset();
+
+    // 2. Generate solution explanation modal HTML
+    const mode = this.gamification.currentMode;
+    const content = document.getElementById('solution-content');
+    if (!content) return;
+
+    if (mode === '4x1_MUX') {
+      content.innerHTML = `
+        <h3 style="color: #f59e0b; font-size: 18px;">💡 Solution Guide: 4x1 Multiplexer (74153 IC)</h3>
+        <p style="font-size: 13px; color: #cbd5e1; margin: 8px 0;">The circuit has been auto-wired on your workbench! Below is the complete pin-to-pin wiring map:</p>
+        <table class="truth-table" style="margin: 12px 0;">
+          <thead>
+            <tr><th>Component Socket</th><th>Wire Color</th><th>74153 IC Pin</th><th>Pin Description</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>+5V VCC</td><td><span style="color:#ef4444;">Red</span></td><td>Pin 16</td><td>VCC (+5V Power)</td></tr>
+            <tr><td>GND</td><td><span style="color:#3b82f6;">Blue</span></td><td>Pin 8 & Pin 1</td><td>GND & 1Ḡ (Active-LOW Strobe)</td></tr>
+            <tr><td>Switch S0</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pin 14</td><td>Select Line A (LSB)</td></tr>
+            <tr><td>Switch S1</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pin 2</td><td>Select Line B (MSB)</td></tr>
+            <tr><td>Switches I0..I3</td><td><span style="color:#10b981;">Green</span></td><td>Pins 6, 5, 4, 3</td><td>Data Inputs 1I0, 1I1, 1I2, 1I3</td></tr>
+            <tr><td>LED Y</td><td><span style="color:#a855f7;">Purple</span></td><td>Pin 7</td><td>Output 1Y</td></tr>
+          </tbody>
+        </table>
+        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 10px; border-radius: 8px; font-size: 12px;">
+          📌 <strong>Verification Tip</strong>: Toggle Switches S1 and S0 to select inputs 00 (I0), 01 (I1), 10 (I2), 11 (I3) and watch LED Y light up matching the selected input!
+        </div>
+      `;
+    } else if (mode === '8x1_MUX') {
+      content.innerHTML = `
+        <h3 style="color: #f59e0b; font-size: 18px;">💡 Solution Guide: 8x1 Multiplexer (74151 IC)</h3>
+        <p style="font-size: 13px; color: #cbd5e1; margin: 8px 0;">The 8x1 MUX circuit has been auto-wired on your breadboard! Here is the wiring schematic:</p>
+        <table class="truth-table" style="margin: 12px 0;">
+          <thead>
+            <tr><th>Trainer Terminal</th><th>Wire Color</th><th>74151 IC Pin</th><th>Function</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>+5V VCC</td><td><span style="color:#ef4444;">Red</span></td><td>Pin 16</td><td>VCC (+5V)</td></tr>
+            <tr><td>GND</td><td><span style="color:#3b82f6;">Blue</span></td><td>Pin 8 & Pin 7</td><td>GND & Ē (Active-LOW Enable)</td></tr>
+            <tr><td>Switches S0, S1, S2</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pins 15, 14, 13</td><td>Select Lines A, B, C</td></tr>
+            <tr><td>Switches I0..I7</td><td><span style="color:#10b981;">Green</span></td><td>Pins 4,3,2,1,12,11,10,9</td><td>Data Inputs D0 to D7</td></tr>
+            <tr><td>LED Y & LED Ȳ</td><td><span style="color:#a855f7;">Purple / Pink</span></td><td>Pins 5 & 6</td><td>Outputs Y (Active) & W (Inverted)</td></tr>
+          </tbody>
+        </table>
+        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 10px; border-radius: 8px; font-size: 12px;">
+          📌 <strong>Verification Tip</strong>: Toggle select lines C(S2), B(S1), A(S0) from 000 up to 111 to route each input I0-I7 directly to LED Y!
+        </div>
+      `;
+    } else {
+      content.innerHTML = `
+        <h3 style="color: #f59e0b; font-size: 18px;">💡 Solution Guide: Boolean Function Challenge</h3>
+        <p style="font-size: 13px; color: #cbd5e1; margin: 8px 0;">Goal: Implement $F(A,B,C) = \\sum m(1,3,6,7)$ using 8x1 MUX (74151 IC).</p>
+        <div style="background: #1e293b; padding: 12px; border-radius: 8px; font-size: 12px; margin: 10px 0;">
+          <strong>Logic Realization Strategy:</strong><br/>
+          • Minterms 1(001), 3(011), 6(110), 7(111) must output 1 → Connect Data Inputs <strong>D1, D3, D6, D7 to +5V VCC</strong>!<br/>
+          • All remaining minterms (0, 2, 4, 5) must output 0 → Connect Data Inputs <strong>D0, D2, D4, D5 to GND</strong>!<br/>
+          • Connect Select Lines C, B, A to Switches S2, S1, S0!
+        </div>
+      `;
+    }
+
+    if (window.soundFx) window.soundFx.playSuccessFanfare();
+    this.gamification.showNotification('💡 Solution auto-wired & guide revealed!');
   }
 
   applyAutoWirePreset() {
