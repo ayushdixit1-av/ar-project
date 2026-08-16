@@ -1,28 +1,35 @@
 /**
- * Interactive Solderless Breadboard & Canvas Wire Renderer
+ * Interactive Solderless Breadboard & Canvas Wire Renderer Engine
+ * Features: High-DPI Canvas scaling, Drag & Drop IC placement, Click/Drag Jumper Wiring,
+ * Column connection visualizer, Voltage Probe tool, and Audio feedback.
  */
 class BreadboardEngine {
   constructor(canvasId, containerId) {
     this.canvas = document.getElementById(canvasId);
     this.ctx = this.canvas.getContext('2d');
     this.container = document.getElementById(containerId);
+    this.dpr = window.devicePixelRatio || 1;
 
     this.cols = 60; // 60 columns on standard breadboard
-    this.gridSpacing = 16; // spacing between hole centers (px)
 
-    // Wire drawing state
-    this.selectedColor = '#ef4444'; // Red default
-    this.activeWireStart = null; // { type, id, pin, x, y }
-    this.hoverTarget = null;
-    this.wires = []; // Array of wire objects
-    this.placedICs = []; // Array of placed IC objects { id, type, pinCount, startCol, label }
+    // Interactive States
+    this.selectedColor = '#ef4444'; // Red default wire color
+    this.activeWireStart = null;    // { type, id, pin, x, y, label }
+    this.isDraggingWire = false;    // Mouse press & drag state
+    this.hoverTarget = null;        // Socket under cursor
+    this.hoverWire = null;          // Wire under cursor
+    this.wires = [];                // Array of wire objects
+    this.placedICs = [];            // Array of placed IC objects
 
-    // Logic probe tool state
+    // IC Drag Placement State
+    this.draggedICType = null;      // '74153' | '74151' etc when dragging from drawer
+
+    // Logic Probe State
     this.probeActive = false;
     this.probePosition = null;
     this.probeVoltage = null;
 
-    // Component IC specifications
+    // Component IC Specifications
     this.icSpecs = {
       '74153': {
         name: '74153',
@@ -76,7 +83,7 @@ class BreadboardEngine {
       }
     };
 
-    this.socketTargets = []; // List of interactive wire snap sockets (trainer & breadboard)
+    this.socketTargets = []; // Snap targets list
     this.mousePos = { x: 0, y: 0 };
 
     this.initEvents();
@@ -88,14 +95,24 @@ class BreadboardEngine {
 
   setProbeMode(active) {
     this.probeActive = active;
+    this.draggedICType = null;
     if (this.canvas) {
       this.canvas.style.cursor = active ? 'crosshair' : 'default';
     }
   }
 
+  setDraggedIC(type) {
+    this.draggedICType = type;
+    this.probeActive = false;
+    if (this.canvas) {
+      this.canvas.style.cursor = type ? 'grab' : 'default';
+    }
+  }
+
   initEvents() {
     window.addEventListener('resize', () => this.resizeCanvas());
-    
+
+    // Mouse Move Listener
     this.canvas.addEventListener('mousemove', (e) => {
       const rect = this.canvas.getBoundingClientRect();
       this.mousePos = {
@@ -105,6 +122,7 @@ class BreadboardEngine {
 
       // Check hovering over socket targets
       this.hoverTarget = this.findNearestSocket(this.mousePos.x, this.mousePos.y);
+      this.hoverWire = this.findWireAt(this.mousePos.x, this.mousePos.y);
 
       if (this.probeActive && this.hoverTarget && window.appEngine) {
         const netKey = this.getSocketNetKey(this.hoverTarget);
@@ -117,40 +135,80 @@ class BreadboardEngine {
       this.requestRender();
     });
 
-    this.canvas.addEventListener('click', (e) => {
+    // Mouse Down Listener (Start Drag Wire or Drag IC Drop)
+    this.canvas.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return; // Only left click
+
+      if (this.draggedICType) {
+        // Drop IC onto breadboard
+        const col = this.getColFromX(this.mousePos.x);
+        if (col >= 1 && col <= this.cols - 8) {
+          this.placeIC(this.draggedICType, col);
+          this.draggedICType = null;
+          this.canvas.style.cursor = 'default';
+        }
+        return;
+      }
+
       if (this.probeActive) return;
 
       if (this.hoverTarget) {
+        this.activeWireStart = this.hoverTarget;
+        this.isDraggingWire = true;
+        if (window.soundFx) window.soundFx.playClick();
+        this.requestRender();
+      }
+    });
+
+    // Mouse Up Listener (Complete Drag Wire)
+    this.canvas.addEventListener('mouseup', (e) => {
+      if (e.button !== 0) return;
+
+      if (this.isDraggingWire && this.activeWireStart) {
+        if (this.hoverTarget && this.hoverTarget !== this.activeWireStart) {
+          this.addWire(this.activeWireStart, this.hoverTarget, this.selectedColor);
+          if (window.soundFx) window.soundFx.playWireConnect();
+        }
+        this.activeWireStart = null;
+        this.isDraggingWire = false;
+        this.requestRender();
+      }
+    });
+
+    // Click Listener (Click-to-wire support)
+    this.canvas.addEventListener('click', (e) => {
+      if (this.probeActive || this.isDraggingWire) return;
+
+      if (this.hoverTarget) {
         if (!this.activeWireStart) {
-          // Start wire drawing
           this.activeWireStart = this.hoverTarget;
           if (window.soundFx) window.soundFx.playClick();
         } else {
-          // Complete wire drawing
           if (this.activeWireStart !== this.hoverTarget) {
             this.addWire(this.activeWireStart, this.hoverTarget, this.selectedColor);
             if (window.soundFx) window.soundFx.playWireConnect();
           }
           this.activeWireStart = null;
         }
-      } else {
+      } else if (!this.hoverTarget) {
         this.activeWireStart = null;
       }
       this.requestRender();
     });
 
+    // Context Menu Listener (Right-click delete wire or cancel wiring)
     this.canvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      // Cancel active wire drawing or remove wire under cursor
-      if (this.activeWireStart) {
+      if (this.activeWireStart || this.draggedICType) {
         this.activeWireStart = null;
+        this.draggedICType = null;
+        this.canvas.style.cursor = 'default';
         this.requestRender();
         return;
       }
-      // Check if clicking near a wire to remove it
-      const wireIndex = this.findWireAt(this.mousePos.x, this.mousePos.y);
-      if (wireIndex !== -1) {
-        this.wires.splice(wireIndex, 1);
+      const wireIdx = this.findWireAt(this.mousePos.x, this.mousePos.y);
+      if (wireIdx !== -1) {
+        this.wires.splice(wireIdx, 1);
         if (window.soundFx) window.soundFx.playWireRemove();
         if (window.appEngine) window.appEngine.stepSimulation();
         this.requestRender();
@@ -160,8 +218,12 @@ class BreadboardEngine {
 
   resizeCanvas() {
     if (!this.container) return;
-    this.canvas.width = this.container.clientWidth;
-    this.canvas.height = this.container.clientHeight;
+    const rect = this.container.getBoundingClientRect();
+    this.dpr = window.devicePixelRatio || 1;
+    this.canvas.width = rect.width * this.dpr;
+    this.canvas.height = rect.height * this.dpr;
+    this.canvas.style.width = `${rect.width}px`;
+    this.canvas.style.height = `${rect.height}px`;
     this.requestRender();
   }
 
@@ -169,9 +231,6 @@ class BreadboardEngine {
     requestAnimationFrame(() => this.render());
   }
 
-  /**
-   * Helper to get Disjoint Net Key for a given socket target
-   */
   getSocketNetKey(socket) {
     if (socket.type === 'trainer') {
       return `trainer:${socket.id}`;
@@ -183,55 +242,42 @@ class BreadboardEngine {
     return '';
   }
 
-  /**
-   * Helper for Disjoint-Set union of breadboard internal column/rail connections
-   */
   getBreadboardHoleNet(union) {
-    // 1. Top Power Rails (+ and - continuous across columns 1-60)
-    for (let c = 2; c <= 60; c++) {
+    // Top Power Rails
+    for (let c = 2; c <= this.cols; c++) {
       union(`bb:top_plus:1:0`, `bb:top_plus:${c}:0`);
       union(`bb:top_minus:1:0`, `bb:top_minus:${c}:0`);
       union(`bb:bot_plus:1:0`, `bb:bot_plus:${c}:0`);
       union(`bb:bot_minus:1:0`, `bb:bot_minus:${c}:0`);
     }
 
-    // 2. Main Terminal Grid Vertical Columns (A-E are tied together, F-J are tied together per column)
+    // Vertical Columns A-E and F-J
     const rowsUpper = ['A', 'B', 'C', 'D', 'E'];
     const rowsLower = ['F', 'G', 'H', 'I', 'J'];
 
-    for (let col = 1; col <= 60; col++) {
-      // Connect A-E for this column
+    for (let col = 1; col <= this.cols; col++) {
       for (let r = 1; r < rowsUpper.length; r++) {
         union(`bb:main:${col}:${rowsUpper[0]}`, `bb:main:${col}:${rowsUpper[r]}`);
       }
-      // Connect F-J for this column
       for (let r = 1; r < rowsLower.length; r++) {
         union(`bb:main:${col}:${rowsLower[0]}`, `bb:main:${col}:${rowsLower[r]}`);
       }
     }
 
-    // 3. Connect placed IC pins to the corresponding breadboard holes
+    // IC Pins to Breadboard Holes
     this.placedICs.forEach(ic => {
       const pinCount = ic.pinCount || 16;
       const halfPins = pinCount / 2;
 
-      // Top row pins (pins halfPins+1 to pinCount, mapped left to right)
-      // e.g. for 16 pin IC, top pins are 16 down to 9
       for (let p = 0; p < halfPins; p++) {
         const pinNum = pinCount - p;
         const col = ic.startCol + p;
-        const holeKey = `bb:main:${col}:E`;
-        const icPinKey = `ic:${ic.id}:${pinNum}`;
-        union(holeKey, icPinKey);
+        union(`bb:main:${col}:E`, `ic:${ic.id}:${pinNum}`);
       }
-
-      // Bottom row pins (pins 1 to halfPins, mapped left to right)
       for (let p = 0; p < halfPins; p++) {
         const pinNum = p + 1;
         const col = ic.startCol + p;
-        const holeKey = `bb:main:${col}:F`;
-        const icPinKey = `ic:${ic.id}:${pinNum}`;
-        union(holeKey, icPinKey);
+        union(`bb:main:${col}:F`, `ic:${ic.id}:${pinNum}`);
       }
     });
   }
@@ -256,7 +302,6 @@ class BreadboardEngine {
     const spec = this.icSpecs[type];
     if (!spec) return;
 
-    // Remove existing IC at same position if any
     this.placedICs = this.placedICs.filter(ic => Math.abs(ic.startCol - startCol) > (spec.pins / 2));
 
     const ic = {
@@ -273,20 +318,14 @@ class BreadboardEngine {
     this.requestRender();
   }
 
-  removeIC(id) {
-    this.placedICs = this.placedICs.filter(ic => ic.id !== id);
-    if (window.appEngine) window.appEngine.stepSimulation();
-    this.requestRender();
-  }
-
   findNearestSocket(x, y) {
     let closest = null;
-    let minDistance = 14; // snap distance radius (px)
+    let minDistance = 16; // Snap radius
 
     for (const socket of this.socketTargets) {
       const dx = socket.x - x;
       const dy = socket.y - y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
+      const dist = Math.hypot(dx, dy);
       if (dist < minDistance) {
         minDistance = dist;
         closest = socket;
@@ -301,11 +340,10 @@ class BreadboardEngine {
       const from = this.getSocketCoords(w.from);
       const to = this.getSocketCoords(w.to);
       if (from && to) {
-        // Distance to curve segment
         const midX = (from.x + to.x) / 2;
         const midY = (from.y + to.y) / 2 + Math.min(60, Math.abs(from.x - to.x) * 0.4);
         const dist = this.distanceToBezier(x, y, from.x, from.y, midX, midY, to.x, to.y);
-        if (dist < 10) return i;
+        if (dist < 12) return i;
       }
     }
     return -1;
@@ -335,23 +373,35 @@ class BreadboardEngine {
     return minDist;
   }
 
+  getColFromX(x) {
+    const rect = this.container.getBoundingClientRect();
+    const bbWidth = 980;
+    const bbX = Math.max(20, (rect.width - bbWidth) / 2);
+    const startX = bbX + 30;
+    const holeSpacingX = (bbWidth - 60) / (this.cols - 1);
+    return Math.round((x - startX) / holeSpacingX) + 1;
+  }
+
   render() {
-    if (!this.canvas) return;
+    if (!this.canvas || !this.container) return;
     const ctx = this.ctx;
-    const W = this.canvas.width;
-    const H = this.canvas.height;
+    const rect = this.container.getBoundingClientRect();
+    const W = rect.width;
+    const H = rect.height;
+
+    ctx.save();
+    ctx.scale(this.dpr, this.dpr);
 
     ctx.clearRect(0, 0, W, H);
-    this.socketTargets = []; // rebuild active sockets list
+    this.socketTargets = []; // Rebuild target list
 
-    // Layout configuration
     const trainerHeight = 180;
     const bbY = trainerHeight + 30;
     const bbWidth = 980;
     const bbHeight = 240;
     const bbX = Math.max(20, (W - bbWidth) / 2);
 
-    // 1. Draw Trainer Kit Top Panel
+    // 1. Draw Digital Trainer Kit Panel
     this.renderTrainerPanel(ctx, 20, 15, W - 40, trainerHeight);
 
     // 2. Draw Solderless Breadboard
@@ -360,10 +410,15 @@ class BreadboardEngine {
     // 3. Draw Placed IC Chips
     this.renderICs(ctx, bbX, bbY);
 
-    // 4. Draw Wires Canvas Overlay
+    // 4. Highlight Connected Holes in same Column/Rail on hover
+    if (this.hoverTarget) {
+      this.renderConnectedHoleHighlights(ctx, this.hoverTarget);
+    }
+
+    // 5. Draw Wires Overlay
     this.renderWires(ctx);
 
-    // 5. Draw Active Wire Dragging
+    // 6. Active Wire Drag Line
     if (this.activeWireStart && this.mousePos) {
       ctx.beginPath();
       ctx.moveTo(this.activeWireStart.x, this.activeWireStart.y);
@@ -376,45 +431,129 @@ class BreadboardEngine {
       ctx.setLineDash([]);
     }
 
-    // 6. Draw Hover Socket Highlight
+    // 7. Hover Socket Ring & Tooltip
     if (this.hoverTarget) {
       ctx.beginPath();
-      ctx.arc(this.hoverTarget.x, this.hoverTarget.y, 7, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(56, 189, 248, 0.6)';
+      ctx.arc(this.hoverTarget.x, this.hoverTarget.y, 8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 2;
       ctx.fill();
       ctx.stroke();
 
-      // Tooltip label
       if (this.hoverTarget.label) {
-        ctx.font = '11px sans-serif';
+        ctx.font = 'bold 11px Inter, sans-serif';
         const txtWidth = ctx.measureText(this.hoverTarget.label).width;
-        ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
-        ctx.fillRect(this.hoverTarget.x - txtWidth / 2 - 4, this.hoverTarget.y - 25, txtWidth + 8, 18);
+        ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+        ctx.fillRect(this.hoverTarget.x - txtWidth / 2 - 6, this.hoverTarget.y - 28, txtWidth + 12, 20);
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(this.hoverTarget.x - txtWidth / 2 - 6, this.hoverTarget.y - 28, txtWidth + 12, 20);
         ctx.fillStyle = '#38bdf8';
-        ctx.fillText(this.hoverTarget.label, this.hoverTarget.x - txtWidth / 2, this.hoverTarget.y - 12);
+        ctx.fillText(this.hoverTarget.label, this.hoverTarget.x - txtWidth / 2, this.hoverTarget.y - 14);
       }
     }
 
-    // 7. Logic Probe HUD Overlay
+    // 8. Hover Wire Delete Hint
+    if (this.hoverWire !== -1 && !this.hoverTarget) {
+      ctx.font = 'bold 11px Inter, sans-serif';
+      ctx.fillStyle = '#ef4444';
+      ctx.fillText('❌ Right-Click to Delete Wire', this.mousePos.x + 12, this.mousePos.y - 10);
+    }
+
+    // 9. Dragging IC Placement Ghost Preview
+    if (this.draggedICType) {
+      const col = this.getColFromX(this.mousePos.x);
+      const spec = this.icSpecs[this.draggedICType];
+      if (spec && col >= 1 && col <= this.cols - 8) {
+        const holeSpacingX = (bbWidth - 60) / (this.cols - 1);
+        const startX = bbX + 30;
+        const centerTrenchY = bbY + bbHeight / 2;
+        const icWidth = (spec.pins / 2) * holeSpacingX + 8;
+        const icX = startX + (col - 1) * holeSpacingX - 4;
+
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.3)';
+        ctx.strokeStyle = '#38bdf8';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.roundRect(icX, centerTrenchY - 18, icWidth, 36, 4);
+        ctx.fill();
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = '#38bdf8';
+        ctx.font = 'bold 12px Inter, sans-serif';
+        ctx.fillText(`Drop IC ${spec.name} at Column ${col}`, this.mousePos.x + 15, this.mousePos.y + 15);
+      }
+    }
+
+    // 10. Logic Probe Floating View
     if (this.probePosition && this.probeVoltage !== null) {
-      ctx.save();
       ctx.font = 'bold 12px monospace';
-      const statusTxt = `LOGIC PROBE: ${this.probeVoltage === 1 ? 'HIGH (1)' : 'LOW (0)'}`;
+      const statusTxt = `PROBE: ${this.probeVoltage === 1 ? 'HIGH (5V)' : 'LOW (0V)'}`;
       ctx.fillStyle = this.probeVoltage === 1 ? '#22c55e' : '#ef4444';
-      ctx.fillRect(this.probePosition.x + 12, this.probePosition.y - 30, 150, 24);
+      ctx.fillRect(this.probePosition.x + 12, this.probePosition.y - 30, 140, 24);
       ctx.fillStyle = '#ffffff';
       ctx.fillText(statusTxt, this.probePosition.x + 20, this.probePosition.y - 14);
-      ctx.restore();
     }
+
+    // 11. Top Wiring Status Guidance Banner
+    this.renderWiringBanner(ctx, W);
+
+    ctx.restore();
   }
 
-  /**
-   * Render Digital Trainer Kit Panel with power, input switches, and output LEDs
-   */
+  renderWiringBanner(ctx, W) {
+    let text = '💡 Click any Socket or Hole to start placing a Jumper Wire | Drag IC from drawer to Breadboard';
+    let color = '#38bdf8';
+
+    if (this.activeWireStart) {
+      text = `🔌 WIRING ACTIVE: Drag or click destination hole to connect [Source: ${this.activeWireStart.label || 'Socket'}]`;
+      color = '#f59e0b';
+    } else if (this.draggedICType) {
+      text = `📦 PLACING IC ${this.draggedICType}: Move cursor over Breadboard DIP channel and click to drop chip!`;
+      color = '#a855f7';
+    } else if (this.probeActive) {
+      text = `🔍 LOGIC PROBE ACTIVE: Hover over any breadboard hole, switch, or IC pin to read voltage level!`;
+      color = '#22c55e';
+    }
+
+    ctx.font = 'bold 12px Inter, sans-serif';
+    const txtWidth = ctx.measureText(text).width;
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.9)';
+    ctx.fillRect((W - txtWidth) / 2 - 14, 2, txtWidth + 28, 22);
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.strokeRect((W - txtWidth) / 2 - 14, 2, txtWidth + 28, 22);
+    ctx.fillStyle = color;
+    ctx.fillText(text, (W - txtWidth) / 2, 17);
+  }
+
+  renderConnectedHoleHighlights(ctx, socket) {
+    if (socket.type !== 'breadboard') return;
+
+    ctx.fillStyle = 'rgba(56, 189, 248, 0.25)';
+    this.socketTargets.forEach(s => {
+      if (s.type === 'breadboard') {
+        if (socket.section === 'main' && s.section === 'main' && socket.col === s.col) {
+          // Highlight same vertical column
+          if ((['A','B','C','D','E'].includes(socket.row) && ['A','B','C','D','E'].includes(s.row)) ||
+              (['F','G','H','I','J'].includes(socket.row) && ['F','G','H','I','J'].includes(s.row))) {
+            ctx.beginPath();
+            ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        } else if (socket.section.includes('plus') && s.section === socket.section) {
+          // Highlight power rail
+          ctx.beginPath();
+          ctx.arc(s.x, s.y, 5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    });
+  }
+
   renderTrainerPanel(ctx, x, y, width, height) {
-    // Panel Background Frame
     const gradient = ctx.createLinearGradient(x, y, x, y + height);
     gradient.addColorStop(0, '#1e293b');
     gradient.addColorStop(1, '#0f172a');
@@ -425,27 +564,25 @@ class BreadboardEngine {
     ctx.fill();
     ctx.stroke();
 
-    // Title Badge
     ctx.font = 'bold 13px Inter, sans-serif';
     ctx.fillStyle = '#38bdf8';
     ctx.fillText('DIGITAL LOGIC TRAINER KIT (MODEL DL-100)', x + 20, y + 25);
 
-    // Section 1: Power Supply Sockets (VCC, GND)
     const pwrX = x + 30;
     const pwrY = y + 50;
-    
-    // VCC (+5V)
+
+    // +5V VCC
     ctx.fillStyle = '#ef4444';
     ctx.font = 'bold 11px sans-serif';
     ctx.fillText('+5V VCC', pwrX, pwrY);
-    this.drawSocket(ctx, pwrX + 20, pwrY + 20, '#ef4444', { type: 'trainer', id: 'VCC', label: '+5V VCC Power' });
+    this.drawSocket(ctx, pwrX + 20, pwrY + 20, '#ef4444', { type: 'trainer', id: 'VCC', label: '+5V VCC Power Socket' });
 
     // GND
     ctx.fillStyle = '#64748b';
     ctx.fillText('GND', pwrX + 80, pwrY);
-    this.drawSocket(ctx, pwrX + 90, pwrY + 20, '#475569', { type: 'trainer', id: 'GND', label: 'Ground (0V)' });
+    this.drawSocket(ctx, pwrX + 90, pwrY + 20, '#475569', { type: 'trainer', id: 'GND', label: 'Ground (0V) Socket' });
 
-    // Section 2: Input Data Switches (I0 to I7)
+    // Data Input Switches I0 - I7
     const swX = x + 220;
     ctx.fillStyle = '#94a3b8';
     ctx.fillText('DATA INPUT SWITCHES (I0 - I7)', swX, pwrY);
@@ -458,28 +595,27 @@ class BreadboardEngine {
       const posX = swX + i * 40;
       const posY = pwrY + 25;
 
-      // Switch toggle box UI
       ctx.fillStyle = val ? '#22c55e' : '#334155';
-      ctx.fillRect(posX - 8, posY - 10, 16, 24);
+      ctx.fillRect(posX - 9, posY - 12, 18, 26);
       ctx.fillStyle = '#ffffff';
-      ctx.font = '9px sans-serif';
-      ctx.fillText(val ? '1' : '0', posX - 3, val ? posY + 6 : posY - 1);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(val ? '1' : '0', posX - 3, val ? posY + 8 : posY - 2);
 
-      // Label
       ctx.fillStyle = '#cbd5e1';
-      ctx.fillText(`I${i}`, posX - 4, posY + 26);
+      ctx.font = '10px sans-serif';
+      ctx.fillText(`I${i}`, posX - 4, posY + 28);
 
-      // Wire Socket
-      this.drawSocket(ctx, posX, posY + 40, val ? '#22c55e' : '#64748b', {
+      this.drawSocket(ctx, posX, posY + 42, val ? '#22c55e' : '#64748b', {
         type: 'trainer',
         id: swKey,
-        label: `Data Input Switch I${i} [State: ${val}]`
+        label: `Data Switch I${i} [State: ${val}]`
       });
     }
 
-    // Section 3: Select Switches (S0, S1, S2) and Enable (E_BAR)
+    // Select Switches (S0, S1, S2, E_BAR)
     const selX = x + 580;
     ctx.fillStyle = '#f59e0b';
+    ctx.font = 'bold 11px sans-serif';
     ctx.fillText('SELECT & STROBE CONTROL', selX, pwrY);
 
     const selSwitches = [
@@ -495,21 +631,22 @@ class BreadboardEngine {
       const posY = pwrY + 25;
 
       ctx.fillStyle = val ? '#f59e0b' : '#334155';
-      ctx.fillRect(posX - 8, posY - 10, 16, 24);
+      ctx.fillRect(posX - 9, posY - 12, 18, 26);
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(val ? '1' : '0', posX - 3, val ? posY + 6 : posY - 1);
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText(val ? '1' : '0', posX - 3, val ? posY + 8 : posY - 2);
 
       ctx.fillStyle = '#fde68a';
-      ctx.fillText(sw.name, posX - 10, posY + 26);
+      ctx.fillText(sw.name, posX - 12, posY + 28);
 
-      this.drawSocket(ctx, posX, posY + 40, val ? '#f59e0b' : '#64748b', {
+      this.drawSocket(ctx, posX, posY + 42, val ? '#f59e0b' : '#64748b', {
         type: 'trainer',
         id: sw.key,
-        label: `${sw.name} Control [State: ${val}]`
+        label: `${sw.name} Switch [State: ${val}]`
       });
     });
 
-    // Section 4: Output LED Indicators (Y1, Y1_BAR, Y2, Y2_BAR)
+    // Output LEDs (Y1, Y1_BAR, Y2, LED0)
     const ledX = x + 790;
     ctx.fillStyle = '#a855f7';
     ctx.fillText('OUTPUT LED INDICATORS', ledX, pwrY);
@@ -526,7 +663,6 @@ class BreadboardEngine {
       const posY = pwrY + 25;
       const active = sim ? sim.ledOutputs[l.id] : 0;
 
-      // Glowing LED bulb rendering
       ctx.beginPath();
       ctx.arc(posX, posY, 10, 0, Math.PI * 2);
       ctx.fillStyle = active ? '#22c55e' : '#1e293b';
@@ -536,18 +672,16 @@ class BreadboardEngine {
       ctx.stroke();
 
       if (active) {
-        // Glow effect
         ctx.beginPath();
         ctx.arc(posX, posY, 16, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(34, 197, 94, 0.25)';
+        ctx.fillStyle = 'rgba(34, 197, 94, 0.3)';
         ctx.fill();
       }
 
       ctx.fillStyle = '#e9d5ff';
-      ctx.fillText(l.label, posX - 8, posY + 26);
+      ctx.fillText(l.label, posX - 8, posY + 28);
 
-      // Wire Socket
-      this.drawSocket(ctx, posX, posY + 40, active ? '#22c55e' : '#64748b', {
+      this.drawSocket(ctx, posX, posY + 42, active ? '#22c55e' : '#64748b', {
         type: 'trainer',
         id: l.id,
         label: `Output LED ${l.label} [State: ${active}]`
@@ -555,19 +689,14 @@ class BreadboardEngine {
     });
   }
 
-  /**
-   * Render Solderless Breadboard holes grid
-   */
   renderBreadboard(ctx, x, y, width, height) {
-    // Breadboard Base Body
-    ctx.fillStyle = '#f8fafc'; // White breadboard plastic body
+    ctx.fillStyle = '#f8fafc';
     ctx.strokeStyle = '#cbd5e1';
     ctx.lineWidth = 2;
     ctx.roundRect(x, y, width, height, 8);
     ctx.fill();
     ctx.stroke();
 
-    // Central DIP IC Divider Trench Channel
     const centerTrenchY = y + height / 2;
     ctx.fillStyle = '#e2e8f0';
     ctx.fillRect(x + 10, centerTrenchY - 6, width - 20, 12);
@@ -575,7 +704,7 @@ class BreadboardEngine {
     const holeSpacingX = (width - 60) / (this.cols - 1);
     const startX = x + 30;
 
-    // 1. Render Top Power Bus (+ Red, - Blue)
+    // Top Power Bus
     const topPlusY = y + 20;
     const topMinusY = y + 36;
 
@@ -594,13 +723,11 @@ class BreadboardEngine {
 
     for (let c = 1; c <= this.cols; c++) {
       const hx = startX + (c - 1) * holeSpacingX;
-      // Top Plus Hole
       this.drawSocket(ctx, hx, topPlusY, '#94a3b8', { type: 'breadboard', section: 'top_plus', col: c, row: 0, label: `Top Rail (+5V) Col ${c}` }, 3);
-      // Top Minus Hole
       this.drawSocket(ctx, hx, topMinusY, '#94a3b8', { type: 'breadboard', section: 'top_minus', col: c, row: 0, label: `Top Rail (GND) Col ${c}` }, 3);
     }
 
-    // 2. Render Main Terminal Rows (A, B, C, D, E above center trench)
+    // Main Upper Terminal Grid (A-E)
     const rowsUpper = ['A', 'B', 'C', 'D', 'E'];
     const startUpperY = y + 60;
     const rowGap = 13;
@@ -613,7 +740,7 @@ class BreadboardEngine {
       }
     });
 
-    // 3. Render Main Terminal Rows (F, G, H, I, J below center trench)
+    // Main Lower Terminal Grid (F-J)
     const rowsLower = ['F', 'G', 'H', 'I', 'J'];
     const startLowerY = centerTrenchY + 15;
 
@@ -625,7 +752,7 @@ class BreadboardEngine {
       }
     });
 
-    // 4. Render Bottom Power Bus (+ Red, - Blue)
+    // Bottom Power Bus
     const botPlusY = y + height - 36;
     const botMinusY = y + height - 20;
 
@@ -648,7 +775,6 @@ class BreadboardEngine {
       this.drawSocket(ctx, hx, botMinusY, '#94a3b8', { type: 'breadboard', section: 'bot_minus', col: c, row: 0, label: `Bot Rail (GND) Col ${c}` }, 3);
     }
 
-    // Breadboard Column Numbers Legend (Every 5 cols)
     ctx.fillStyle = '#64748b';
     ctx.font = '9px monospace';
     for (let c = 5; c <= this.cols; c += 5) {
@@ -657,9 +783,6 @@ class BreadboardEngine {
     }
   }
 
-  /**
-   * Render Dual In-Line Package (DIP) IC Chips placed on breadboard
-   */
   renderICs(ctx, bbX, bbY) {
     const holeSpacingX = (980 - 60) / (this.cols - 1);
     const startX = bbX + 30;
@@ -675,7 +798,6 @@ class BreadboardEngine {
       const icX = startX + (ic.startCol - 1) * holeSpacingX - 4;
       const icY = centerTrenchY - icHeight / 2;
 
-      // IC Body Box
       ctx.fillStyle = '#0f172a';
       ctx.strokeStyle = '#38bdf8';
       ctx.lineWidth = 1.5;
@@ -683,23 +805,20 @@ class BreadboardEngine {
       ctx.fill();
       ctx.stroke();
 
-      // Pin 1 Notch Indicator (Left Side)
       ctx.beginPath();
       ctx.arc(icX + 4, icY + icHeight / 2, 4, -Math.PI / 2, Math.PI / 2);
       ctx.fillStyle = '#334155';
       ctx.fill();
 
-      // Chip Label Text
       ctx.fillStyle = '#f8fafc';
       ctx.font = 'bold 11px Inter, monospace';
       ctx.fillText(spec.name, icX + 16, icY + 22);
 
-      // Register Pins as Snap Sockets
-      // Top Pins: Pins halfPins+1 down to pinCount
+      // Top Pins
       for (let p = 0; p < halfPins; p++) {
         const pinNum = spec.pins - p;
         const hx = startX + (ic.startCol - 1 + p) * holeSpacingX;
-        const hy = centerTrenchY - 18; // Row E pin height
+        const hy = centerTrenchY - 18;
         const pinName = spec.pinLabels[pinNum - 1] || `Pin ${pinNum}`;
         this.drawSocket(ctx, hx, hy, '#cbd5e1', {
           type: 'ic',
@@ -709,11 +828,11 @@ class BreadboardEngine {
         }, 3.5);
       }
 
-      // Bottom Pins: Pins 1 to halfPins
+      // Bottom Pins
       for (let p = 0; p < halfPins; p++) {
         const pinNum = p + 1;
         const hx = startX + (ic.startCol - 1 + p) * holeSpacingX;
-        const hy = centerTrenchY + 18; // Row F pin height
+        const hy = centerTrenchY + 18;
         const pinName = spec.pinLabels[pinNum - 1] || `Pin ${pinNum}`;
         this.drawSocket(ctx, hx, hy, '#cbd5e1', {
           type: 'ic',
@@ -725,23 +844,19 @@ class BreadboardEngine {
     });
   }
 
-  /**
-   * Render Jumper Wires connecting sockets
-   */
   renderWires(ctx) {
     const sim = window.appEngine ? window.appEngine.simulation : null;
 
-    this.wires.forEach(w => {
+    this.wires.forEach((w, idx) => {
       const fromPos = this.getSocketCoords(w.from);
       const toPos = this.getSocketCoords(w.to);
       if (!fromPos || !toPos) return;
 
-      // Determine signal state for wire glow
       const netKeyFrom = this.getSocketNetKey(w.from);
       const val = sim ? sim.getNodeState(netKeyFrom) : 0;
       const isHigh = (val === 1);
+      const isHovered = (this.hoverWire === idx);
 
-      // Render Bezier curve wire path
       ctx.beginPath();
       ctx.moveTo(fromPos.x, fromPos.y);
 
@@ -754,28 +869,22 @@ class BreadboardEngine {
 
       ctx.quadraticCurveTo(cpX, cpY, toPos.x, toPos.y);
 
-      // Outer Wire Color
-      ctx.strokeStyle = w.color;
-      ctx.lineWidth = isHigh ? 5 : 4;
+      ctx.strokeStyle = isHovered ? '#ffffff' : w.color;
+      ctx.lineWidth = isHigh ? 6 : 4;
       ctx.stroke();
 
-      // Active Voltage High Glow Overlay
       if (isHigh) {
-        ctx.strokeStyle = '#ffffff';
+        ctx.strokeStyle = '#86efac';
         ctx.lineWidth = 1.5;
         ctx.stroke();
       }
 
-      // Wire Terminal Caps
       ctx.fillStyle = '#334155';
       ctx.fillRect(fromPos.x - 3, fromPos.y - 3, 6, 6);
       ctx.fillRect(toPos.x - 3, toPos.y - 3, 6, 6);
     });
   }
 
-  /**
-   * Draw interactive terminal socket hole
-   */
   drawSocket(ctx, x, y, color, targetData, radius = 4) {
     targetData.x = x;
     targetData.y = y;

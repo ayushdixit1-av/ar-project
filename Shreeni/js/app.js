@@ -1,5 +1,6 @@
 /**
  * Main Application Orchestrator & UI Handler
+ * Connects User Interactions, Circuit Solver, Breadboard Canvas, and Gamification Engine.
  */
 class AppManager {
   constructor() {
@@ -13,6 +14,9 @@ class AppManager {
   init() {
     this.breadboard.resizeCanvas();
     this.gamification.setMode('4x1_MUX');
+
+    // Place default 74153 IC on breadboard DIP slot for instant interactivity
+    this.breadboard.placeIC('74153', 25);
 
     this.bindUIEvents();
     this.stepSimulation();
@@ -65,26 +69,60 @@ class AppManager {
         const mode = e.target.dataset.mode;
         this.gamification.setMode(mode);
 
+        // Place default appropriate IC chip for selected mode
+        if (mode === '4x1_MUX') {
+          this.breadboard.placeIC('74153', 25);
+        } else if (mode === '8x1_MUX' || mode === 'CHALLENGE') {
+          this.breadboard.placeIC('74151', 25);
+        }
+
         if (window.soundFx) window.soundFx.playClick();
         this.stepSimulation();
       });
     });
 
-    // 4. IC Placement Drawer Buttons
+    // 4. IC Drawer Click / Drag Placement
     document.querySelectorAll('.ic-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const chipType = e.currentTarget.dataset.chip;
-        this.breadboard.placeIC(chipType, 25);
+        this.breadboard.setDraggedIC(chipType);
+        if (window.soundFx) window.soundFx.playClick();
+      });
+
+      btn.addEventListener('dragstart', (e) => {
+        const chipType = e.currentTarget.dataset.chip;
+        e.dataTransfer.setData('text/plain', chipType);
+        this.breadboard.setDraggedIC(chipType);
       });
     });
 
-    // 5. Wire Color Selector Palette
+    // Allow dropping IC directly on canvas container
+    const container = document.getElementById('workbench-container');
+    if (container) {
+      container.addEventListener('dragover', (e) => e.preventDefault());
+      container.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const chipType = e.dataTransfer.getData('text/plain') || this.breadboard.draggedICType;
+        if (chipType) {
+          const rect = this.breadboard.canvas.getBoundingClientRect();
+          const dropX = e.clientX - rect.left;
+          const col = this.breadboard.getColFromX(dropX);
+          if (col >= 1 && col <= this.breadboard.cols - 8) {
+            this.breadboard.placeIC(chipType, col);
+          }
+          this.breadboard.setDraggedIC(null);
+        }
+      });
+    }
+
+    // 5. Wire Color Palette Selection
     document.querySelectorAll('.color-swatch').forEach(swatch => {
       swatch.addEventListener('click', (e) => {
         document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
         e.target.classList.add('active');
         const color = e.target.dataset.color;
         this.breadboard.setWireColor(color);
+        this.breadboard.setProbeMode(false);
       });
     });
 
@@ -128,7 +166,7 @@ class AppManager {
       closeDs.addEventListener('click', () => dsModal.classList.remove('open'));
     }
 
-    // 8. Trainer Switch Toggles via Canvas interactions (Clicking switches)
+    // 8. Trainer Switch Clicks
     this.breadboard.canvas.addEventListener('click', (e) => {
       const rect = this.breadboard.canvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -138,9 +176,6 @@ class AppManager {
     });
   }
 
-  /**
-   * Detect click on Trainer Panel Input/Select Switches
-   */
   handleTrainerSwitchClicks(x, y) {
     const pwrY = 15 + 50;
     const swY = pwrY + 25;
@@ -149,7 +184,7 @@ class AppManager {
     const swX = 220;
     for (let i = 0; i < 8; i++) {
       const posX = swX + i * 40;
-      if (Math.abs(x - posX) < 14 && Math.abs(y - swY) < 20) {
+      if (Math.abs(x - posX) < 18 && Math.abs(y - swY) < 24) {
         const swKey = `I${i}`;
         const curVal = this.simulation.trainerSwitches[swKey];
         this.simulation.setSwitch(swKey, curVal ? 0 : 1);
@@ -164,7 +199,7 @@ class AppManager {
     const selSwitches = ['S0', 'S1', 'S2', 'E_BAR'];
     selSwitches.forEach((key, idx) => {
       const posX = selX + idx * 45;
-      if (Math.abs(x - posX) < 14 && Math.abs(y - swY) < 20) {
+      if (Math.abs(x - posX) < 18 && Math.abs(y - swY) < 24) {
         const curVal = this.simulation.trainerSwitches[key];
         this.simulation.setSwitch(key, curVal ? 0 : 1);
         if (window.soundFx) window.soundFx.playSwitch();
@@ -174,93 +209,58 @@ class AppManager {
     });
   }
 
-  /**
-   * Automatically Wire Experiment Setup for instant demonstration
-   */
   applyAutoWirePreset() {
     this.breadboard.clearWires();
     const mode = this.gamification.currentMode;
 
     if (mode === '4x1_MUX') {
-      // 1. Place 74153 IC if not present
       this.breadboard.placeIC('74153', 25);
       const ic = this.breadboard.placedICs[0];
 
-      // 2. Wire VCC (Pin 16 -> Top Plus Rail) and GND (Pin 8 -> Top Minus Rail)
-      this.breadboard.addWire(
-        { type: 'trainer', id: 'VCC' },
-        { type: 'ic', id: ic.id, pin: 16 },
-        '#ef4444'
-      );
-      this.breadboard.addWire(
-        { type: 'trainer', id: 'GND' },
-        { type: 'ic', id: ic.id, pin: 8 },
-        '#3b82f6'
-      );
-      // Wire Strobe 1G_bar (Pin 1) to GND
-      this.breadboard.addWire(
-        { type: 'trainer', id: 'GND' },
-        { type: 'ic', id: ic.id, pin: 1 },
-        '#3b82f6'
-      );
+      // VCC & GND & Strobe
+      this.breadboard.addWire({ type: 'trainer', id: 'VCC' }, { type: 'ic', id: ic.id, pin: 16 }, '#ef4444');
+      this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 8 }, '#3b82f6');
+      this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 1 }, '#3b82f6');
 
-      // 3. Wire Selects: S0 (A) -> Pin 14, S1 (B) -> Pin 2
-      this.breadboard.addWire(
-        { type: 'trainer', id: 'S0' },
-        { type: 'ic', id: ic.id, pin: 14 },
-        '#f59e0b'
-      );
-      this.breadboard.addWire(
-        { type: 'trainer', id: 'S1' },
-        { type: 'ic', id: ic.id, pin: 2 },
-        '#f59e0b'
-      );
+      // Selects
+      this.breadboard.addWire({ type: 'trainer', id: 'S0' }, { type: 'ic', id: ic.id, pin: 14 }, '#f59e0b');
+      this.breadboard.addWire({ type: 'trainer', id: 'S1' }, { type: 'ic', id: ic.id, pin: 2 }, '#f59e0b');
 
-      // 4. Wire Inputs: I0 -> Pin 6, I1 -> Pin 5, I2 -> Pin 4, I3 -> Pin 3
+      // Data Inputs
       this.breadboard.addWire({ type: 'trainer', id: 'I0' }, { type: 'ic', id: ic.id, pin: 6 }, '#10b981');
       this.breadboard.addWire({ type: 'trainer', id: 'I1' }, { type: 'ic', id: ic.id, pin: 5 }, '#10b981');
       this.breadboard.addWire({ type: 'trainer', id: 'I2' }, { type: 'ic', id: ic.id, pin: 4 }, '#10b981');
       this.breadboard.addWire({ type: 'trainer', id: 'I3' }, { type: 'ic', id: ic.id, pin: 3 }, '#10b981');
 
-      // 5. Wire Output: Pin 7 (1Y) -> Output LED Y1
-      this.breadboard.addWire(
-        { type: 'ic', id: ic.id, pin: 7 },
-        { type: 'trainer', id: 'Y1' },
-        '#a855f7'
-      );
+      // Output Y1
+      this.breadboard.addWire({ type: 'ic', id: ic.id, pin: 7 }, { type: 'trainer', id: 'Y1' }, '#a855f7');
 
       this.gamification.showNotification('⚡ Auto-Wired 4x1 Multiplexer (74153 IC) Setup!');
 
     } else if (mode === '8x1_MUX' || mode === 'CHALLENGE') {
-      // 1. Place 74151 IC
       this.breadboard.placeIC('74151', 25);
       const ic = this.breadboard.placedICs[0];
 
-      // 2. Wire VCC (Pin 16), GND (Pin 8), E_bar Strobe (Pin 7 -> GND)
       this.breadboard.addWire({ type: 'trainer', id: 'VCC' }, { type: 'ic', id: ic.id, pin: 16 }, '#ef4444');
       this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 8 }, '#3b82f6');
       this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 7 }, '#3b82f6');
 
-      // 3. Wire Selects: S0(A)->Pin 15, S1(B)->Pin 14, S2(C)->Pin 13
       this.breadboard.addWire({ type: 'trainer', id: 'S0' }, { type: 'ic', id: ic.id, pin: 15 }, '#f59e0b');
       this.breadboard.addWire({ type: 'trainer', id: 'S1' }, { type: 'ic', id: ic.id, pin: 14 }, '#f59e0b');
       this.breadboard.addWire({ type: 'trainer', id: 'S2' }, { type: 'ic', id: ic.id, pin: 13 }, '#f59e0b');
 
       if (mode === '8x1_MUX') {
-        // Wire D0-D7 to Inputs I0-I7
         const pinMap = [4, 3, 2, 1, 12, 11, 10, 9];
         pinMap.forEach((pin, i) => {
           this.breadboard.addWire({ type: 'trainer', id: `I${i}` }, { type: 'ic', id: ic.id, pin: pin }, '#10b981');
         });
       } else {
-        // Challenge: Wire D1, D3, D6, D7 to VCC; others to GND
-        const vccPins = [3, 1, 10, 9]; // D1, D3, D6, D7
-        const gndPins = [4, 2, 12, 11]; // D0, D2, D4, D5
+        const vccPins = [3, 1, 10, 9];
+        const gndPins = [4, 2, 12, 11];
         vccPins.forEach(p => this.breadboard.addWire({ type: 'trainer', id: 'VCC' }, { type: 'ic', id: ic.id, pin: p }, '#ef4444'));
         gndPins.forEach(p => this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: p }, '#3b82f6'));
       }
 
-      // 4. Wire Outputs: Pin 5 (Y) -> LED Y1, Pin 6 (W) -> LED Y1_BAR
       this.breadboard.addWire({ type: 'ic', id: ic.id, pin: 5 }, { type: 'trainer', id: 'Y1' }, '#a855f7');
       this.breadboard.addWire({ type: 'ic', id: ic.id, pin: 6 }, { type: 'trainer', id: 'Y1_BAR' }, '#ec4899');
 

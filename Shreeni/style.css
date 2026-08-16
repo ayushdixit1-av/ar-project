@@ -146,7 +146,7 @@ body {
 /* Main Workbench Layout Grid */
 .workbench-layout {
   display: grid;
-  grid-template-columns: 240px 1fr 340px;
+  grid-template-columns: 260px 1fr 340px;
   gap: 16px;
   padding: 16px;
   height: calc(100vh - 65px);
@@ -165,7 +165,7 @@ body {
 }
 
 .panel-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   text-transform: uppercase;
   color: var(--accent-cyan);
@@ -187,17 +187,23 @@ body {
   border-radius: 8px;
   padding: 10px;
   color: #fff;
-  cursor: pointer;
+  cursor: grab;
   display: flex;
   align-items: center;
   gap: 12px;
   transition: all 0.2s ease;
+  user-select: none;
+}
+
+.ic-btn:active {
+  cursor: grabbing;
 }
 
 .ic-btn:hover {
   border-color: var(--accent-cyan);
   background: #334155;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(56, 189, 248, 0.2);
 }
 
 .ic-chip-icon {
@@ -224,26 +230,26 @@ body {
 /* Wire Color Selector Palette */
 .color-palette {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .color-swatch {
-  width: 24px;
-  height: 24px;
+  width: 26px;
+  height: 26px;
   border-radius: 50%;
   cursor: pointer;
   border: 2px solid transparent;
-  transition: transform 0.2s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 .color-swatch:hover {
-  transform: scale(1.15);
+  transform: scale(1.2);
 }
 
 .color-swatch.active {
   border-color: #ffffff;
-  box-shadow: 0 0 8px currentColor;
+  box-shadow: 0 0 10px currentColor;
 }
 
 /* Central Interactive Canvas Workbench */
@@ -291,6 +297,7 @@ body {
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 #workbench-canvas {
@@ -358,7 +365,7 @@ body {
 }
 
 .truth-table tr.row-verified {
-  background: rgba(34, 197, 94, 0.12);
+  background: rgba(34, 197, 94, 0.15);
 }
 
 .badge-pending {
@@ -406,7 +413,7 @@ body {
 .modal-overlay {
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
   backdrop-filter: blur(6px);
   display: flex;
   justify-content: center;
@@ -426,7 +433,7 @@ body {
   background: #0f172a;
   border: 1px solid var(--accent-cyan);
   border-radius: 12px;
-  width: 500px;
+  width: 520px;
   max-width: 90%;
   padding: 24px;
   color: var(--text-main);
@@ -441,7 +448,7 @@ body {
   background: transparent;
   border: none;
   color: var(--text-muted);
-  font-size: 20px;
+  font-size: 22px;
   cursor: pointer;
 }
 
