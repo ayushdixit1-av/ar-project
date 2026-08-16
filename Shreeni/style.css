@@ -157,6 +157,41 @@ body {
   transform: translateY(-1px);
 }
 
+/* Interactive Solution Modal Options Tabs */
+.solution-option-selector {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 16px;
+  background: #1e293b;
+  padding: 6px;
+  border-radius: 8px;
+}
+
+.sol-opt-tab {
+  flex: 1;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 13px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sol-opt-tab:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.sol-opt-tab.active {
+  background: rgba(245, 158, 11, 0.2);
+  border-color: var(--accent-yellow);
+  color: #fde68a;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.3);
+}
+
 /* Main Workbench Layout Grid */
 .workbench-layout {
   display: grid;

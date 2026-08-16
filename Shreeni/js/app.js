@@ -68,7 +68,8 @@ class AppManager {
     solBtns.forEach(btn => {
       if (btn) {
         btn.addEventListener('click', () => {
-          this.revealSolution();
+          const currentMode = this.gamification.currentMode === '8x1_MUX' ? '8x1' : '4x1';
+          this.revealSolution(currentMode);
           if (solModal) solModal.classList.add('open');
         });
       }
@@ -78,7 +79,18 @@ class AppManager {
       closeSol.addEventListener('click', () => solModal.classList.remove('open'));
     }
 
-    // 4. Mode Tabs Switcher (4x1 MUX, 8x1 MUX, Challenge, Sandbox)
+    // 4. Interactive Solution Option Selector Tabs (4x1 vs 8x1 MUX)
+    document.querySelectorAll('.sol-opt-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        document.querySelectorAll('.sol-opt-tab').forEach(t => t.classList.remove('active'));
+        e.target.classList.add('active');
+
+        const muxType = e.target.dataset.mux; // '4x1' | '8x1'
+        this.revealSolution(muxType);
+      });
+    });
+
+    // 5. Mode Tabs Switcher (4x1 MUX, 8x1 MUX, Challenge, Sandbox)
     document.querySelectorAll('.mode-tab').forEach(tab => {
       tab.addEventListener('click', (e) => {
         document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
@@ -98,7 +110,7 @@ class AppManager {
       });
     });
 
-    // 5. IC Drawer Click / Drag Placement
+    // 6. IC Drawer Click / Drag Placement
     document.querySelectorAll('.ic-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const chipType = e.currentTarget.dataset.chip;
@@ -131,7 +143,7 @@ class AppManager {
       });
     }
 
-    // 6. Wire Color Palette Selection
+    // 7. Wire Color Palette Selection
     document.querySelectorAll('.color-swatch').forEach(swatch => {
       swatch.addEventListener('click', (e) => {
         document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
@@ -142,7 +154,7 @@ class AppManager {
       });
     });
 
-    // 7. Action Tools: Logic Probe, Clear Wires, Auto-Wire Preset
+    // 8. Action Tools: Logic Probe, Clear Wires, Auto-Wire Preset
     const probeBtn = document.getElementById('btn-probe');
     if (probeBtn) {
       probeBtn.addEventListener('click', () => {
@@ -167,7 +179,7 @@ class AppManager {
       });
     }
 
-    // 8. Modals: Datasheet popup
+    // 9. Modals: Datasheet popup
     const dsBtn = document.getElementById('btn-datasheet');
     const dsModal = document.getElementById('modal-datasheet');
     const closeDs = document.getElementById('close-datasheet');
@@ -182,7 +194,7 @@ class AppManager {
       closeDs.addEventListener('click', () => dsModal.classList.remove('open'));
     }
 
-    // 9. Trainer Switch Clicks
+    // 10. Trainer Switch Clicks
     this.breadboard.canvas.addEventListener('click', (e) => {
       const rect = this.breadboard.canvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
@@ -226,93 +238,35 @@ class AppManager {
   }
 
   /**
-   * Reveal Solution: Auto-wires circuit, sets switches, and displays complete step-by-step wiring guide
+   * Reveal Solution for user selected option ('4x1' or '8x1' MUX)
+   * Places IC and organizes jumper wires on the breadboard, then renders step-by-step solution guide.
    */
-  revealSolution() {
-    // 1. Perform Auto-Wire
-    this.applyAutoWirePreset();
+  revealSolution(muxType = '4x1') {
+    // Synchronize Modal Option Tab active states
+    document.querySelectorAll('.sol-opt-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.mux === muxType);
+    });
 
-    // 2. Generate solution explanation modal HTML
-    const mode = this.gamification.currentMode;
-    const content = document.getElementById('solution-content');
-    if (!content) return;
+    // 1. Organize Breadboard IC & Wires for requested MUX solution
+    if (muxType === '4x1') {
+      this.gamification.setMode('4x1_MUX');
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === '4x1_MUX'));
 
-    if (mode === '4x1_MUX') {
-      content.innerHTML = `
-        <h3 style="color: #f59e0b; font-size: 18px;">💡 Solution Guide: 4x1 Multiplexer (74153 IC)</h3>
-        <p style="font-size: 13px; color: #cbd5e1; margin: 8px 0;">The circuit has been auto-wired on your workbench! Below is the complete pin-to-pin wiring map:</p>
-        <table class="truth-table" style="margin: 12px 0;">
-          <thead>
-            <tr><th>Component Socket</th><th>Wire Color</th><th>74153 IC Pin</th><th>Pin Description</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>+5V VCC</td><td><span style="color:#ef4444;">Red</span></td><td>Pin 16</td><td>VCC (+5V Power)</td></tr>
-            <tr><td>GND</td><td><span style="color:#3b82f6;">Blue</span></td><td>Pin 8 & Pin 1</td><td>GND & 1Ḡ (Active-LOW Strobe)</td></tr>
-            <tr><td>Switch S0</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pin 14</td><td>Select Line A (LSB)</td></tr>
-            <tr><td>Switch S1</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pin 2</td><td>Select Line B (MSB)</td></tr>
-            <tr><td>Switches I0..I3</td><td><span style="color:#10b981;">Green</span></td><td>Pins 6, 5, 4, 3</td><td>Data Inputs 1I0, 1I1, 1I2, 1I3</td></tr>
-            <tr><td>LED Y</td><td><span style="color:#a855f7;">Purple</span></td><td>Pin 7</td><td>Output 1Y</td></tr>
-          </tbody>
-        </table>
-        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 10px; border-radius: 8px; font-size: 12px;">
-          📌 <strong>Verification Tip</strong>: Toggle Switches S1 and S0 to select inputs 00 (I0), 01 (I1), 10 (I2), 11 (I3) and watch LED Y light up matching the selected input!
-        </div>
-      `;
-    } else if (mode === '8x1_MUX') {
-      content.innerHTML = `
-        <h3 style="color: #f59e0b; font-size: 18px;">💡 Solution Guide: 8x1 Multiplexer (74151 IC)</h3>
-        <p style="font-size: 13px; color: #cbd5e1; margin: 8px 0;">The 8x1 MUX circuit has been auto-wired on your breadboard! Here is the wiring schematic:</p>
-        <table class="truth-table" style="margin: 12px 0;">
-          <thead>
-            <tr><th>Trainer Terminal</th><th>Wire Color</th><th>74151 IC Pin</th><th>Function</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>+5V VCC</td><td><span style="color:#ef4444;">Red</span></td><td>Pin 16</td><td>VCC (+5V)</td></tr>
-            <tr><td>GND</td><td><span style="color:#3b82f6;">Blue</span></td><td>Pin 8 & Pin 7</td><td>GND & Ē (Active-LOW Enable)</td></tr>
-            <tr><td>Switches S0, S1, S2</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pins 15, 14, 13</td><td>Select Lines A, B, C</td></tr>
-            <tr><td>Switches I0..I7</td><td><span style="color:#10b981;">Green</span></td><td>Pins 4,3,2,1,12,11,10,9</td><td>Data Inputs D0 to D7</td></tr>
-            <tr><td>LED Y & LED Ȳ</td><td><span style="color:#a855f7;">Purple / Pink</span></td><td>Pins 5 & 6</td><td>Outputs Y (Active) & W (Inverted)</td></tr>
-          </tbody>
-        </table>
-        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 10px; border-radius: 8px; font-size: 12px;">
-          📌 <strong>Verification Tip</strong>: Toggle select lines C(S2), B(S1), A(S0) from 000 up to 111 to route each input I0-I7 directly to LED Y!
-        </div>
-      `;
-    } else {
-      content.innerHTML = `
-        <h3 style="color: #f59e0b; font-size: 18px;">💡 Solution Guide: Boolean Function Challenge</h3>
-        <p style="font-size: 13px; color: #cbd5e1; margin: 8px 0;">Goal: Implement $F(A,B,C) = \\sum m(1,3,6,7)$ using 8x1 MUX (74151 IC).</p>
-        <div style="background: #1e293b; padding: 12px; border-radius: 8px; font-size: 12px; margin: 10px 0;">
-          <strong>Logic Realization Strategy:</strong><br/>
-          • Minterms 1(001), 3(011), 6(110), 7(111) must output 1 → Connect Data Inputs <strong>D1, D3, D6, D7 to +5V VCC</strong>!<br/>
-          • All remaining minterms (0, 2, 4, 5) must output 0 → Connect Data Inputs <strong>D0, D2, D4, D5 to GND</strong>!<br/>
-          • Connect Select Lines C, B, A to Switches S2, S1, S0!
-        </div>
-      `;
-    }
-
-    if (window.soundFx) window.soundFx.playSuccessFanfare();
-    this.gamification.showNotification('💡 Solution auto-wired & guide revealed!');
-  }
-
-  applyAutoWirePreset() {
-    this.breadboard.clearWires();
-    const mode = this.gamification.currentMode;
-
-    if (mode === '4x1_MUX') {
+      this.breadboard.clearWires();
       this.breadboard.placeIC('74153', 25);
       const ic = this.breadboard.placedICs[0];
 
-      // VCC & GND & Strobe
+      // Neatly organize wires
+      // VCC & GND
       this.breadboard.addWire({ type: 'trainer', id: 'VCC' }, { type: 'ic', id: ic.id, pin: 16 }, '#ef4444');
       this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 8 }, '#3b82f6');
       this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 1 }, '#3b82f6');
 
-      // Selects
+      // Select inputs S0 (A) and S1 (B)
       this.breadboard.addWire({ type: 'trainer', id: 'S0' }, { type: 'ic', id: ic.id, pin: 14 }, '#f59e0b');
       this.breadboard.addWire({ type: 'trainer', id: 'S1' }, { type: 'ic', id: ic.id, pin: 2 }, '#f59e0b');
 
-      // Data Inputs
+      // Data inputs I0 - I3
       this.breadboard.addWire({ type: 'trainer', id: 'I0' }, { type: 'ic', id: ic.id, pin: 6 }, '#10b981');
       this.breadboard.addWire({ type: 'trainer', id: 'I1' }, { type: 'ic', id: ic.id, pin: 5 }, '#10b981');
       this.breadboard.addWire({ type: 'trainer', id: 'I2' }, { type: 'ic', id: ic.id, pin: 4 }, '#10b981');
@@ -321,37 +275,92 @@ class AppManager {
       // Output Y1
       this.breadboard.addWire({ type: 'ic', id: ic.id, pin: 7 }, { type: 'trainer', id: 'Y1' }, '#a855f7');
 
-      this.gamification.showNotification('⚡ Auto-Wired 4x1 Multiplexer (74153 IC) Setup!');
+    } else if (muxType === '8x1') {
+      this.gamification.setMode('8x1_MUX');
+      document.querySelectorAll('.mode-tab').forEach(t => t.classList.toggle('active', t.dataset.mode === '8x1_MUX'));
 
-    } else if (mode === '8x1_MUX' || mode === 'CHALLENGE') {
+      this.breadboard.clearWires();
       this.breadboard.placeIC('74151', 25);
       const ic = this.breadboard.placedICs[0];
 
+      // VCC & GND & Strobe
       this.breadboard.addWire({ type: 'trainer', id: 'VCC' }, { type: 'ic', id: ic.id, pin: 16 }, '#ef4444');
       this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 8 }, '#3b82f6');
       this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: 7 }, '#3b82f6');
 
+      // Select lines S0, S1, S2
       this.breadboard.addWire({ type: 'trainer', id: 'S0' }, { type: 'ic', id: ic.id, pin: 15 }, '#f59e0b');
       this.breadboard.addWire({ type: 'trainer', id: 'S1' }, { type: 'ic', id: ic.id, pin: 14 }, '#f59e0b');
       this.breadboard.addWire({ type: 'trainer', id: 'S2' }, { type: 'ic', id: ic.id, pin: 13 }, '#f59e0b');
 
-      if (mode === '8x1_MUX') {
-        const pinMap = [4, 3, 2, 1, 12, 11, 10, 9];
-        pinMap.forEach((pin, i) => {
-          this.breadboard.addWire({ type: 'trainer', id: `I${i}` }, { type: 'ic', id: ic.id, pin: pin }, '#10b981');
-        });
-      } else {
-        const vccPins = [3, 1, 10, 9];
-        const gndPins = [4, 2, 12, 11];
-        vccPins.forEach(p => this.breadboard.addWire({ type: 'trainer', id: 'VCC' }, { type: 'ic', id: ic.id, pin: p }, '#ef4444'));
-        gndPins.forEach(p => this.breadboard.addWire({ type: 'trainer', id: 'GND' }, { type: 'ic', id: ic.id, pin: p }, '#3b82f6'));
-      }
+      // Data inputs I0 - I7
+      const pinMap = [4, 3, 2, 1, 12, 11, 10, 9];
+      pinMap.forEach((pin, i) => {
+        this.breadboard.addWire({ type: 'trainer', id: `I${i}` }, { type: 'ic', id: ic.id, pin: pin }, '#10b981');
+      });
 
+      // Output Y & W
       this.breadboard.addWire({ type: 'ic', id: ic.id, pin: 5 }, { type: 'trainer', id: 'Y1' }, '#a855f7');
       this.breadboard.addWire({ type: 'ic', id: ic.id, pin: 6 }, { type: 'trainer', id: 'Y1_BAR' }, '#ec4899');
-
-      this.gamification.showNotification('⚡ Auto-Wired 8x1 Multiplexer (74151 IC) Setup!');
     }
+
+    this.stepSimulation();
+
+    // 2. Populate Modal Content
+    const content = document.getElementById('solution-content');
+    if (!content) return;
+
+    if (muxType === '4x1') {
+      content.innerHTML = `
+        <h3 style="color: #f59e0b; font-size: 17px; margin-bottom: 8px;">🎓 Organized Solution: 4x1 Multiplexer (74153 IC)</h3>
+        <p style="font-size: 12px; color: #cbd5e1;">The <strong>74153 IC</strong> is placed on Column 25 of the breadboard. Below is the complete organized pin-to-pin wiring map:</p>
+        <table class="truth-table" style="margin: 10px 0;">
+          <thead>
+            <tr><th>Trainer Socket</th><th>Wire Color</th><th>74153 Pin</th><th>Function</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>+5V VCC</td><td><span style="color:#ef4444;">Red</span></td><td>Pin 16</td><td>VCC Power (+5V)</td></tr>
+            <tr><td>GND</td><td><span style="color:#3b82f6;">Blue</span></td><td>Pin 8 & Pin 1</td><td>Ground & 1Ḡ Strobe (Active-LOW)</td></tr>
+            <tr><td>Switch S0</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pin 14</td><td>Select Line A (LSB)</td></tr>
+            <tr><td>Switch S1</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pin 2</td><td>Select Line B (MSB)</td></tr>
+            <tr><td>Switches I0..I3</td><td><span style="color:#10b981;">Green</span></td><td>Pins 6, 5, 4, 3</td><td>Data Inputs 1I0, 1I1, 1I2, 1I3</td></tr>
+            <tr><td>LED Y</td><td><span style="color:#a855f7;">Purple</span></td><td>Pin 7</td><td>Output 1Y</td></tr>
+          </tbody>
+        </table>
+        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 10px; border-radius: 8px; font-size: 12px;">
+          ⚡ <strong>Interactive Verification</strong>: Toggle S1 and S0 on the trainer kit to test inputs 00(I0), 01(I1), 10(I2), 11(I3) and observe LED Y light up!
+        </div>
+      `;
+    } else {
+      content.innerHTML = `
+        <h3 style="color: #f59e0b; font-size: 17px; margin-bottom: 8px;">🔬 Organized Solution: 8x1 Multiplexer (74151 IC)</h3>
+        <p style="font-size: 12px; color: #cbd5e1;">The <strong>74151 IC</strong> is placed on Column 25 of the breadboard. Below is the organized wiring map:</p>
+        <table class="truth-table" style="margin: 10px 0;">
+          <thead>
+            <tr><th>Trainer Socket</th><th>Wire Color</th><th>74151 Pin</th><th>Function</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>+5V VCC</td><td><span style="color:#ef4444;">Red</span></td><td>Pin 16</td><td>VCC Power (+5V)</td></tr>
+            <tr><td>GND</td><td><span style="color:#3b82f6;">Blue</span></td><td>Pin 8 & Pin 7</td><td>Ground & Ē Enable (Active-LOW)</td></tr>
+            <tr><td>Switches S0, S1, S2</td><td><span style="color:#f59e0b;">Yellow</span></td><td>Pins 15, 14, 13</td><td>Select Lines A, B, C</td></tr>
+            <tr><td>Switches I0..I7</td><td><span style="color:#10b981;">Green</span></td><td>Pins 4,3,2,1,12,11,10,9</td><td>Data Inputs D0 to D7</td></tr>
+            <tr><td>LED Y & LED Ȳ</td><td><span style="color:#a855f7;">Purple / Pink</span></td><td>Pins 5 & 6</td><td>Outputs Y (Active) & W (Inverted)</td></tr>
+          </tbody>
+        </table>
+        <div style="background: rgba(245, 158, 11, 0.15); border: 1px solid #f59e0b; padding: 10px; border-radius: 8px; font-size: 12px;">
+          ⚡ <strong>Interactive Verification</strong>: Toggle S2, S1, S0 (000 to 111) to route each input I0..I7 to LED Y and its inverted state to LED Ȳ!
+        </div>
+      `;
+    }
+
+    if (window.soundFx) window.soundFx.playSuccessFanfare();
+    this.gamification.showNotification(`💡 Solution applied for ${muxType} MUX on breadboard!`);
+  }
+
+  applyAutoWirePreset() {
+    const mode = this.gamification.currentMode;
+    const muxType = (mode === '8x1_MUX' || mode === 'CHALLENGE') ? '8x1' : '4x1';
+    this.revealSolution(muxType);
   }
 
   updateDatasheetModal() {

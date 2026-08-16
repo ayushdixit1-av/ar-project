@@ -109,7 +109,7 @@
       <div>
         <div class="panel-title">🛠️ Lab Tools</div>
         <div style="display: flex; flex-direction: column; gap: 8px;">
-          <button class="btn-header btn-solution" id="btn-show-solution-side" style="width: 100%;">💡 Show Solution Guide</button>
+          <button class="btn-header btn-solution" id="btn-show-solution-side" style="width: 100%;">💡 Solution Options</button>
           <button class="btn-header" id="btn-probe">🔍 Logic Probe</button>
           <button class="btn-header" id="btn-auto-wire" style="border-color: var(--accent-yellow); color: var(--accent-yellow);">⚡ Auto-Wire Preset</button>
           <button class="btn-header" id="btn-clear-wires">🗑️ Clear All Wires</button>
@@ -154,10 +154,17 @@
     </div>
   </div>
 
-  <!-- Solution Helper Overlay Modal -->
+  <!-- Interactive Solution Helper Overlay Modal -->
   <div class="modal-overlay" id="modal-solution">
-    <div class="modal-card" style="width: 600px;">
+    <div class="modal-card" style="width: 640px;">
       <button class="close-btn" id="close-solution">&times;</button>
+      
+      <!-- Interactive MUX Solution Option Tabs -->
+      <div class="solution-option-selector">
+        <button class="sol-opt-tab active" id="tab-sol-4x1" data-mux="4x1">🎓 4x1 MUX Solution (74153 IC)</button>
+        <button class="sol-opt-tab" id="tab-sol-8x1" data-mux="8x1">🔬 8x1 MUX Solution (74151 IC)</button>
+      </div>
+
       <div id="solution-content"></div>
     </div>
   </div>
