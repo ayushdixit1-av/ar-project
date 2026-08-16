@@ -1,0 +1,800 @@
+/* ==========================================================================
+   AR LOGIC DESIGN LAB - FULL & HALF ADDER EXPERIMENT STYLESHEET
+   ========================================================================== */
+
+:root {
+    --primary-blue: #0f4c81;
+    --accent-blue: #1e88e5;
+    --bg-dark: #0f172a;
+    --card-bg: rgba(30, 41, 59, 0.85);
+    --border-color: rgba(255, 255, 255, 0.12);
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    
+    /* LED Glow Colors matching Image 1 */
+    --led-red-glow: #ff2a2a;
+    --led-red-shadow: rgba(255, 42, 42, 0.85);
+    --led-green-glow: #00ff66;
+    --led-green-shadow: rgba(0, 255, 102, 0.85);
+    
+    --paper-bg: #ffffff;
+    --psit-maroon: #800000;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--bg-dark);
+    color: var(--text-main);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+}
+
+/* Header Navbar */
+.app-header {
+    height: 60px;
+    background: #090d16;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 1.25rem;
+    z-index: 100;
+    position: relative;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.header-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.logo-icon {
+    width: 38px;
+    height: 38px;
+    background: linear-gradient(135deg, #1e88e5, #0f4c81);
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.2rem;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(30, 136, 229, 0.5);
+}
+
+.brand-text h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: #fff;
+}
+
+.brand-text .sub-title {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Lab Mode Selector Buttons */
+.lab-mode-selector, .view-mode-selector {
+    display: flex;
+    background: rgba(255, 255, 255, 0.06);
+    padding: 4px;
+    border-radius: 10px;
+    gap: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mode-btn, .view-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 7px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.mode-btn:hover, .view-btn:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.mode-btn.active, .view-btn.active {
+    background: #1e88e5;
+    color: #fff;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(30, 136, 229, 0.4);
+}
+
+/* Header Actions */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.action-icon-btn {
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.action-icon-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+}
+
+#btn-power {
+    background: rgba(16, 185, 129, 0.2);
+    border-color: #10b981;
+    color: #10b981;
+}
+
+#btn-power.off {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+/* Main Workspace Layout */
+.lab-workspace {
+    display: flex;
+    height: calc(100vh - 60px);
+    width: 100vw;
+    position: relative;
+    overflow: hidden;
+}
+
+/* Viewport 3D Canvas */
+.viewport-container {
+    flex: 1;
+    position: relative;
+    height: 100%;
+    background: radial-gradient(circle at center, #1e293b 0%, #090d16 100%);
+}
+
+#three-canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* Canvas HUD Overlay */
+.canvas-hud {
+    position: absolute;
+    top: 15px;
+    left: 15px;
+    right: 15px;
+    pointer-events: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+.hud-card {
+    pointer-events: auto;
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 12px 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}
+
+.hud-card-header {
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.switches-group {
+    display: flex;
+    gap: 16px;
+}
+
+.switch-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+}
+
+.switch-item label {
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.toggle-switch {
+    width: 52px;
+    height: 28px;
+    background: #334155;
+    border-radius: 14px;
+    padding: 3px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.4);
+    position: relative;
+}
+
+.switch-handle {
+    width: 22px;
+    height: 22px;
+    background: #cbd5e1;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #0f172a;
+    transition: transform 0.3s ease, background 0.3s ease;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch.on {
+    background: #10b981;
+}
+
+.toggle-switch.on .switch-handle {
+    transform: translateX(24px);
+    background: #ffffff;
+    color: #047857;
+}
+
+.pin-badge {
+    font-size: 0.65rem;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+}
+
+/* Outputs LED Status HUD Card */
+.outputs-group {
+    display: flex;
+    gap: 20px;
+}
+
+.output-led-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.led-indicator {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #334155;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+    transition: all 0.3s ease;
+}
+
+/* Glowing Red LED state matching image 1 */
+.led-indicator.red-led-glow.active {
+    background: #ff1a1a;
+    box-shadow: 0 0 15px #ff2a2a, 0 0 30px #ff0000, inset 0 -3px 6px #800000;
+}
+
+/* Glowing Green LED state matching image 1 */
+.led-indicator.green-led-glow.active {
+    background: #00ff66;
+    box-shadow: 0 0 15px #00ff66, 0 0 30px #00cc44, inset 0 -3px 6px #006622;
+}
+
+.output-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.out-label {
+    font-size: 0.85rem;
+    font-weight: 700;
+}
+
+.out-val {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: 'Fira Code', monospace;
+}
+
+.out-eq {
+    font-size: 0.65rem;
+    color: #60a5fa;
+    font-style: italic;
+}
+
+/* HUD View Presets Bar */
+.hud-view-presets {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    pointer-events: auto;
+    display: flex;
+    background: var(--card-bg);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    padding: 6px;
+    border-radius: 30px;
+    gap: 6px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.hud-view-presets button {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.78rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s ease;
+}
+
+.hud-view-presets button:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* Tooltip overlay */
+.hover-tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(15, 23, 42, 0.95);
+    border: 1px solid #1e88e5;
+    padding: 8px 12px;
+    border-radius: 6px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    z-index: 100;
+}
+
+.tooltip-title {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #60a5fa;
+}
+
+.tooltip-desc {
+    font-size: 0.75rem;
+    color: #e2e8f0;
+    margin-top: 2px;
+}
+
+/* AR Mode Overlay controls */
+.ar-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: auto;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 80px;
+}
+
+.ar-badge {
+    position: absolute;
+    top: 20px;
+    background: #1e88e5;
+    color: #fff;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    box-shadow: 0 0 15px rgba(30, 136, 229, 0.6);
+}
+
+.ar-hint {
+    color: #fff;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 8px 16px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 20px;
+    text-align: center;
+    max-width: 90%;
+}
+
+.ar-touch-controls {
+    display: flex;
+    gap: 10px;
+}
+
+.ar-touch-controls button {
+    background: #1e293b;
+    color: #fff;
+    border: 1px solid var(--border-color);
+    padding: 10px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.ar-touch-controls button.ar-exit-btn {
+    background: #ef4444;
+}
+
+/* ==========================================================================
+   AUTHENTIC PSIT LAB MANUAL SHEET STYLING (LOOKING REAL)
+   ========================================================================== */
+
+.lab-manual-drawer {
+    width: 650px;
+    height: 100%;
+    background: #111827;
+    border-left: 1px solid var(--border-color);
+    position: relative;
+    transition: margin-right 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+    z-index: 50;
+}
+
+.lab-manual-drawer.closed {
+    margin-right: -650px;
+}
+
+.manual-drag-handle {
+    position: absolute;
+    top: 50%;
+    left: -24px;
+    transform: translateY(-50%);
+    width: 24px;
+    height: 60px;
+    background: #111827;
+    border: 1px solid var(--border-color);
+    border-right: none;
+    border-radius: 8px 0 0 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+}
+
+.manual-paper-wrapper {
+    background: var(--paper-bg);
+    color: #000000;
+    min-height: 100%;
+    padding: 30px;
+    font-family: 'Times New Roman', Times, serif;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.05);
+    line-height: 1.4;
+}
+
+/* Header matching PSIT Image 3 & 4 */
+.psit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    border-bottom: 2px solid var(--psit-maroon);
+    padding-bottom: 12px;
+    margin-bottom: 10px;
+}
+
+.psit-logo-box {
+    text-align: center;
+    color: var(--psit-maroon);
+}
+
+.psit-brand-logo {
+    font-family: 'Cinzel', serif;
+    font-size: 2rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: -1px;
+}
+
+.psit-sub {
+    font-size: 0.9rem;
+    font-weight: bold;
+    font-style: italic;
+}
+
+.psit-title-box {
+    text-align: center;
+    flex: 1;
+    padding: 0 10px;
+}
+
+.psit-title-box h2 {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: var(--psit-maroon);
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+}
+
+.psit-title-box .accreditation {
+    font-size: 0.65rem;
+    color: #333;
+}
+
+.psit-title-box .code {
+    font-size: 0.7rem;
+    font-weight: bold;
+    color: #000;
+}
+
+.psit-title-box .contact, .psit-title-box .admin {
+    font-size: 0.58rem;
+    color: #444;
+}
+
+/* NAAC A+ Badge */
+.naac-badge {
+    width: 55px;
+    height: 55px;
+}
+
+.naac-circle {
+    width: 100%;
+    height: 100%;
+    border: 3px double #d97706;
+    background: radial-gradient(circle, #fef3c7, #f59e0b);
+    border-radius: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.naac-circle .grade {
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #78350f;
+    line-height: 1;
+}
+
+.naac-circle .naac {
+    font-size: 0.55rem;
+    font-weight: bold;
+    color: #78350f;
+}
+
+.date-stamp-bar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+}
+
+.date-box {
+    border: 1px solid #000;
+    padding: 2px 10px;
+    font-size: 0.85rem;
+    font-weight: bold;
+}
+
+.exp-title-block {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.exp-title-block h1 {
+    font-size: 1.35rem;
+    text-decoration: underline;
+    font-weight: bold;
+    color: #000;
+    margin-bottom: 6px;
+}
+
+.exp-title-block h3 {
+    font-size: 0.95rem;
+    font-weight: bold;
+    text-align: left;
+}
+
+.manual-section {
+    margin-bottom: 16px;
+}
+
+.manual-section h4 {
+    font-size: 0.9rem;
+    font-weight: bold;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+    color: #000;
+}
+
+.apparatus-list, .procedure-list {
+    padding-left: 24px;
+    font-size: 0.88rem;
+}
+
+.apparatus-list li, .procedure-list li {
+    margin-bottom: 4px;
+}
+
+.theory-text {
+    font-size: 0.88rem;
+    text-align: justify;
+    text-justify: inter-word;
+}
+
+.lab-circuit-spec {
+    margin-bottom: 20px;
+    border-top: 1px solid #ccc;
+    padding-top: 10px;
+}
+
+.spec-heading {
+    font-size: 1.05rem;
+    font-weight: bold;
+    margin-bottom: 10px;
+    text-decoration: underline;
+}
+
+.diagram-truth-flex {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.diagram-col {
+    flex: 1;
+}
+
+.truth-table-col {
+    flex: 1;
+}
+
+.diagram-col h5, .truth-table-col h5, .circuit-diagram-box h5 {
+    font-size: 0.88rem;
+    font-weight: bold;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.svg-diagram-card {
+    border: 1px solid #000;
+    padding: 8px;
+    background: #fff;
+    display: flex;
+    justify-content: center;
+}
+
+.svg-diagram-card.large {
+    min-height: 160px;
+}
+
+.manual-svg {
+    width: 100%;
+    height: auto;
+    max-height: 200px;
+}
+
+/* Truth Table Styling */
+.manual-truth-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+.manual-truth-table th, .manual-truth-table td {
+    border: 1px solid #000;
+    padding: 4px 8px;
+}
+
+.manual-truth-table th {
+    background: #f1f5f9;
+    font-weight: bold;
+}
+
+.manual-truth-table tr {
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.manual-truth-table tr:hover {
+    background: #e2e8f0;
+}
+
+.manual-truth-table tr.active-row {
+    background: #bbf7d0 !important;
+    font-weight: bold;
+}
+
+.boolean-equations {
+    background: #f8fafc;
+    border: 1px dashed #94a3b8;
+    padding: 8px 15px;
+    margin-bottom: 15px;
+}
+
+.math-eq {
+    font-size: 0.95rem;
+    font-family: 'Times New Roman', Times, serif;
+    font-style: italic;
+    margin-bottom: 4px;
+}
+
+.double-col {
+    display: flex;
+    gap: 15px;
+}
+
+.col-box {
+    flex: 1;
+    border: 1px solid #cbd5e1;
+    padding: 10px;
+    border-radius: 4px;
+    background: #fafafa;
+}
+
+.col-box ul {
+    padding-left: 18px;
+    font-size: 0.82rem;
+}
+
+.manual-footer-line {
+    margin-top: 25px;
+    border-top: 2px solid var(--psit-maroon);
+    padding-top: 6px;
+    font-size: 0.72rem;
+    font-weight: bold;
+    text-align: center;
+    color: var(--psit-maroon);
+    letter-spacing: 0.5px;
+}
+
+/* Print Stylesheet for authentic print view */
+@media print {
+    .app-header, .canvas-hud, #three-canvas, .manual-drag-handle {
+        display: none !important;
+    }
+    
+    .lab-workspace {
+        height: auto;
+        display: block;
+    }
+    
+    .lab-manual-drawer {
+        width: 100% !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        background: #fff !important;
+        overflow: visible !important;
+    }
+    
+    .manual-paper-wrapper {
+        padding: 0 !important;
+    }
+}
