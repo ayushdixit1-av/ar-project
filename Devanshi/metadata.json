@@ -1,6 +1,6 @@
 {
   "name": "Binary & Gray Code Converter (IC 7486)",
-  "description": "Interactive 3D Virtual Electronics Lab simulator for 4-bit Binary to Gray and Gray to Binary code conversion using the 7486 Quad XOR IC on a realistic breadboard with Augmented Reality (AR) mode.",
+  "description": "Interactive 3D Virtual Electronics Lab simulator with customizable breadboard wiring, benchtop DC power supply, digital multimeter, workbench table platform, discrete LEDs, IC component library, and AR mode.",
   "requestFramePermissions": [
     "camera"
   ],

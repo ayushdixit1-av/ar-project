@@ -4,15 +4,16 @@ import { Table, Check, Search, Sparkles, HelpCircle } from 'lucide-react';
 
 interface TruthTableProps {
   mode: ConverterMode;
-  rows: TruthTableRow[];
-  onSelectRow: (decimal: number) => void;
+  rows?: TruthTableRow[];
+  onSelectRow?: (decimal: number) => void;
 }
 
-export const TruthTable: React.FC<TruthTableProps> = ({ mode, rows, onSelectRow }) => {
+export const TruthTable: React.FC<TruthTableProps> = ({ mode, rows = [], onSelectRow }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const isBin2Gray = mode === 'bin2gray';
 
-  const filteredRows = rows.filter((r) => {
+  const safeRows = Array.isArray(rows) ? rows : [];
+  const filteredRows = safeRows.filter((r) => {
     if (!searchTerm) return true;
     const term = searchTerm.toLowerCase();
     return (

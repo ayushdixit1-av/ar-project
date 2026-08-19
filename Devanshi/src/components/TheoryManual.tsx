@@ -1,7 +1,13 @@
 import React, { useState } from 'react';
+import { ConverterMode, ICComponentInfo } from '../types';
 import { BookOpen, CheckCircle, Cpu, Sparkles, Layers, ArrowRight, ShieldCheck } from 'lucide-react';
 
-export const TheoryManual: React.FC = () => {
+interface TheoryManualProps {
+  mode?: ConverterMode;
+  selectedIC?: ICComponentInfo;
+}
+
+export const TheoryManual: React.FC<TheoryManualProps> = ({ mode = 'bin2gray', selectedIC }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'formulas' | 'ic7486' | 'applications'>('overview');
 
   return (
